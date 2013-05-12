@@ -1,3 +1,9 @@
+#-------------------------------------------------------------------------------
+# Copyright: CodeChix 2013
+# Author   : deepadhurka 
+# Date     : 12 May 2013 
+#-------------------------------------------------------------------------------
+
 Objective
 --------------------------------------------------------------------------------
 Working, demonstration-ready code for submission to:
@@ -15,13 +21,24 @@ Branching
 2. dev-onf-driver - dev branch for forking and pull requests by contributors
 
 Suggested workflow for contributors:
-1. Fork the dev-onf-driver branch from your github account. 
-   dev-onf-driver will now become your 'upstream'
-   The 'origin' will be your independent copy of this branch, in your account
+1. Fork the repo from your github account. 
+   You will have forked both the master and the dev-onf-driver branches.
 
-2. Clone the origin from your github account to your local unix/linux dev environment 
-   You can branch it all you like - this will not impact upstream.
-   Code, commit, push to your branch/origin until ready to merge with upstream.
+2. Clone your local repo from your github account to your local unix/linux 
+dev environment 
+Git commands to achieve this:
+a.  git clone https://github.com/<your github user id>/CC-ONF-driver.git 
+b.  git checkout -b dev-onf-driver origin/dev-onf-driver
+Branch dev-onf-driver set up to track remote branch dev-onf-driver from origin.
+Switched to a new branch 'dev-onf-driver'
+
+   Note: our working branch is dev-onf-driver. So any further branching MUST
+         be done off of dev-onf-driver branch and merged back eventually.
+
+   You can now branch it all you like - this will not impact upstream.
+   Code, commit, push to your repo until ready to merge with upstream.
+   Again, as a final step, merge with your dev-onf-driver branch BEFORE 
+   pull request.
 
 3. Initiate a 'pull request' via github online account for
    a. Initiating code review
@@ -34,3 +51,6 @@ Banner for all new files:
 # Author   : <github account name>
 # Date     : <date of file creation>
 #-------------------------------------------------------------------------------
+
+Footnote:
+Please email deepa.karnad@gmail.com for any issues with info published in this file

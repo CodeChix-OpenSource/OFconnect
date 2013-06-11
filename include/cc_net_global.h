@@ -15,6 +15,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "cc_net_conn.h"
+#include "cc_log.h"
 
 client_svcs_t *client_svcs_map[MAX_L4_TYPE];
 server_svcs_t *server_svcs_map[MAX_L4_TYPE];

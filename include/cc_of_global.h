@@ -52,7 +52,7 @@ typdef struct cc_ofchannel_info_ {
 
 typedef struct cc_ofdev_key_ {
     ipaddr_v4v6_t  controller_ip_addr;
-    ipaddr_v4v6_t  switch_ip_addr[]; /*UNUSED for dev type CONTROLLER */
+    ipaddr_v4v6_t  switch_ip_addr; /*UNUSED for dev type CONTROLLER */
 } cc_ofdev_key_t
 
 /* node in ofdev_htbl */

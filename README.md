@@ -27,7 +27,7 @@ Suggested workflow for contributors:
 2. Clone your local repo from your github account to your local unix/linux 
 dev environment 
 Git commands to achieve this:
-a.  git clone https://github.com/<your github user id>/CC-ONF-driver.git 
+a.  git clone https://github.com/<your github user id>/CC-ONF-driver.git
 b.  git checkout -b dev-onf-driver origin/dev-onf-driver
 Branch dev-onf-driver set up to track remote branch dev-onf-driver from origin.
 Switched to a new branch 'dev-onf-driver'

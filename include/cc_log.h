@@ -25,13 +25,13 @@
 #define CC_LOG_DEBUG(...)\
     g_log(CC_LOG_DOMAIN, G_LOG_LEVEL_DEBUG, __VA_ARGS__)
 
-#define CC_LOG_CRITICAL(...)\
+#define CC_LOG_ERROR(...)\
     g_log(CC_LOG_DOMAIN, G_LOG_LEVEL_CRITICAL, __VA_ARGS__)
 
 #define CC_LOG_INFO(...)\
     g_log(CC_LOG_DOMAIN, G_LOG_LEVEL_INFO, __VA_ARGS__)
 
-#define CC_LOG_ERROR(...)\
+#define CC_LOG_FATAL(...)\
     g_log(CC_LOG_DOMAIN, G_LOG_LEVEL_ERROR, __VA_ARGS__)
 
 #endif //CC_LOG_H

@@ -16,6 +16,10 @@
 #include <arpa/inet.h>
 #include "cc_net_conn.h"
 #include "cc_log.h"
+#include "cc_pollthr_mgr.h"
+
+#define SIZE_RW_THREAD_BUCKET        10
+#define MAX_PER_THREAD_RWSOCKETS     100
 
 typedef enum of_dev_type_ {
     SWITCH = 0,
@@ -23,39 +27,44 @@ typedef enum of_dev_type_ {
     MAX_OF_DEV_TYPE
 } of_dev_type_e;
 
-typedef enum cc_ofchannel_state_ {
-    CC_OF_CHANNEL_DOWN = 0,
-    CC_OF_CHANNEL_UP
-} cc_ofchannel_state_e;
+typedef enum cc_ofrw_state_ {
+    CC_OF_RW_DOWN = 0,
+    CC_OF_RW_UP
+} cc_ofrw_state_e;
 
-typdef struct cc_ofchannel_key_ {
+typdef struct cc_ofrw_key_ {
     int       rw_sockfd;    
-} cc_of_channel_key_t;
+} cc_of_rw_key_t;
 
 /* node in ofrw_htbl */
 typdef struct cc_ofrw_info_ {
-    cc_ofchannel_key_t   key;
-    cc_ofchannel_state_e state;
-    GThread              *thread_p;
-
-    //RD pipe to thread
-    //WR pipe to thread
-    //synchronization vars
-
+    cc_ofrw_key_t        key;
+    cc_ofrw_state_e      state;
+    adpoll_thread_mgr_t  *thr_mgr_p;
+    
     /* stats */
 } cc_ofrw_info_t;
 
 typedef struct cc_ofdev_key_ {
     ipaddr_v4v6_t  controller_ip_addr;
-    ipaddr_v4v6_t  switch_ip_addr; /*UNUSED for dev type CONTROLLER */
+    ipaddr_v4v6_t  switch_ip_addr;
     L4_type_e      layer4_proto;    
-} cc_ofdev_key_t
+} cc_ofdev_key_t;
+
+typedef enum cc_ofver_ {
+    CC_OFVER_1_0   = 0,
+    CC_OFVER_1_3,
+    CC_OFVER_1_3_1
+} cc_ofver_e;
 
 /* node in ofdev_htbl */
 typedef struct cc_ofdev_info_ {
     cc_ofdev_key_t key;
+
     uint16_t       controller_L4_port;
 
+    cc_ofver_e     of_max_ver;
+    
     uint32_t       count_rwsockets;
     GList          *ofrw_socket_list; //list of rw sockets
     //LOCK for htbl
@@ -73,18 +82,21 @@ typedef struct cc_ofchannel_key_ {
 typedef struct cc_ofchann_info_ {
     cc_ofchannel_key_t    key;
     int                   rw_sockfd;
+    int                   count_retries; /* CLIENT: reconnection attempts */
 } cc_ofchannel_info_t;
 
+typedef struct cc_ofthreads_ {
+    GThread          *thread_p;
+    uint32_t         count_rwsockets;
+} cc_ofthreads_t;
 
 typedef struct cc_of_global_ {
-    /* device type could be controller or switch */
+    /* driver type could be controller or switch */
     of_drv_type_e     ofdrv_type;
 
-    /* controller: spawns multiple IP address endpoints
-     *             for the same controller
-     *             (multiple instances of same controller)
-     * switch:
-     */
+    /* layer4 device type could be client or server */
+    of_dev_type_e     ofdev_type;
+
     GHashTable       *ofdev_htbl;
     uint32_t         count_devs;
     //LOCK for htbl
@@ -97,6 +109,9 @@ typedef struct cc_of_global_ {
     uint32_t         count_ofrw;
     
     net_svcs_t       NET_SVCS[MAX_OF_DRV_TYPE][MAX_L4_TYPE];
+
+    GList            *ofpollthr_htbl;
+    uint32_t         count_pollthr;
     
 } cc_of_global_t;
 

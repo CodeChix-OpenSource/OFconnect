@@ -1,5 +1,7 @@
+/*-----------------------------------------------------------------------------*/
+/* Copyright: CodeChix Bay Area Chapter 2013                                   */
+/*-----------------------------------------------------------------------------*/
 #include "cc_pollthr_mgr.h"
-
 
 adpoll_thread_mgr_t *
 adp_thr_mgr_new(char *tname,

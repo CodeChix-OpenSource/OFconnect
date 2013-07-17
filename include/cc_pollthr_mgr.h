@@ -1,3 +1,69 @@
+/*-----------------------------------------------------------------------------*/
+/* Copyright: CodeChix Bay Area Chapter 2013                                   */
+/*-----------------------------------------------------------------------------*/
+/*
+ * Utility Library
+ * Polling Thread Manager does the following:
+ *     spawn one Polling Thread and
+ *     create two primary pipes, read and write between Manager and Polling Thr
+ *     provide capability to add or delete fds (sockets or pipes)
+ *         to the polling loop in Polling Thread
+ *     provide cleanup API
+ *
+ * The Polling Thread Manager utility is flexible in that each FD is associated
+ *     with its own set of callback functions for POLLIN and POLLOUT
+ *
+ * adp_thr_mgr_new() - Initialize the instance of polling thread manager
+ *                     Creates a new Polling Thread and 2 primary pipes
+ *                     Sets up Polling Thread with poll loop with initially
+ *                         just the primary read FD
+ *
+ * adp_thr_mgr_add_del_fd() - Add/Del socket/pipe FDs to the polling loop
+ *                                in polling thread
+ *                            Del of primary pipe FD will self-destruct this
+ *                                instance of Polling Thread Manager
+ *
+ * adp_thr_mgr_free() - Cleans up an instance of Polling Thread Manager
+ *
+ * Sample code
+ adpoll_thread_mgr_t *tmgr;    
+        
+ tmgr = adp_thr_mgr_new("aaroh", 2, 10);
+
+ * Add pipe
+ add_fd_msg.fd_type = PIPE;
+ add_fd_msg.fd_action = ADD;
+ add_fd_msg.poll_events = POLLIN;
+ add_fd_msg.pollin_func = NULL;
+ add_fd_msg.pollout_func = NULL;
+ 
+ new_pipe_wr_fd1 = adp_thr_mgr_add_del_fd(tmgr, &add_fd_msg);
+ if (new_pipe_wr_fd1 != -1) {
+ CC_LOG_DEBUG("%s(%d): successful new write pipe: %d",
+ __FUNCTION__, __LINE__, new_pipe_wr_fd1);
+ }
+ new_pipe_wr_fd2 = adp_thr_mgr_add_del_fd(tmgr, &add_fd_msg);
+ 
+ * Delete pipe
+ add_fd_msg.fd_type = PIPE;
+ add_fd_msg.fd_action = DELETE;
+ add_fd_msg.fd = new_pipe_wr_fd1;
+ add_fd_msg.pollin_func = NULL;
+ add_fd_msg.pollout_func = NULL;
+ 
+ adp_thr_mgr_add_del_fd(tmgr, &add_fd_msg);
+
+ * Delete primary pipe to self destruct
+ 
+ add_fd_msg.fd_type = PIPE;
+ add_fd_msg.fd_action = DELETE;
+ add_fd_msg.fd = PRI_PIPE_WR_FD;
+ add_fd_msg.pollin_func = NULL;
+ add_fd_msg.pollout_func = NULL;
+ adp_thr_mgr_add_del_fd(tmgr, &add_fd_msg);
+ adp_thr_mgr_free(tmgr);
+*/
+ 
 #ifndef CC_POLLTHR_MGR_H
 #define CC_POLLTHR_MGR_H
 
@@ -13,16 +79,20 @@
 #include <errno.h>
 #include <assert.h>
 
+/* length of name string for Polling Thread */
 #define MAX_NAME_LEN   16
 
+/* Index of primary pipes in pipes_arr */
 #define PRI_PIPE_RD_FD 0
 #define PRI_PIPE_WR_FD 1
 
+/* Index offsets for read and write pipes */
 #define RD_OFFSET      0
 #define WR_OFFSET      1
 
 #define IS_FD_WR(fd) (fd % 2)
 
+/* Thread-priate data for Polling Thread */
 static GPrivate tname_key;
 
 typedef enum adpoll_fd_type_ {
@@ -35,10 +105,11 @@ typedef enum adpoll_fd_action_ {
     DELETE
 } adpoll_fd_action_e;
 
+/* Callback function for FD poll-in and poll-out */
 typedef void (*fd_process_func)(char *tname,
                                 void *data_p);
 
-/* async dynamic poll-thread manager */
+/* Global data for async dynamic poll-thread manager */
 typedef struct adpoll_thread_mgr {
     char          tname[MAX_NAME_LEN];
     uint16_t      num_sockets;

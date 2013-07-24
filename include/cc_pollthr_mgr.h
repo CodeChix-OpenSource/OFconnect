@@ -176,6 +176,8 @@ int adp_thr_mgr_get_num_fds(adpoll_thread_mgr_t *this);
 void adp_thr_mgr_get_pri_pipe(adpoll_thread_mgr_t *this,
                               int *main_pipe); /* 2 fds returned */
 
+uint32_t adp_thr_mgr_get_num_avail_sockfd(adpoll_thread_mgr_t *this);
+
 void adp_thr_mgr_free(adpoll_thread_mgr_t *this);
 
 #endif

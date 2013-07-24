@@ -34,7 +34,7 @@ typedef enum cc_ofrw_state_ {
 
 typdef struct cc_ofrw_key_ {
     int       rw_sockfd;    
-} cc_of_rw_key_t;
+} cc_ofrw_key_t;
 
 /* node in ofrw_htbl */
 typdef struct cc_ofrw_info_ {
@@ -85,11 +85,6 @@ typedef struct cc_ofchann_info_ {
     int                   count_retries; /* CLIENT: reconnection attempts */
 } cc_ofchannel_info_t;
 
-typedef struct cc_ofthreads_ {
-    GThread          *thread_p;
-    uint32_t         count_rwsockets;
-} cc_ofthreads_t;
-
 typedef struct cc_of_global_ {
     /* driver type could be controller or switch */
     of_drv_type_e     ofdrv_type;
@@ -97,6 +92,7 @@ typedef struct cc_of_global_ {
     /* layer4 device type could be client or server */
     of_dev_type_e     ofdev_type;
 
+    /* node: cc_ofdev_info_t */
     GHashTable       *ofdev_htbl;
     uint32_t         count_devs;
     //LOCK for htbl
@@ -110,9 +106,13 @@ typedef struct cc_of_global_ {
     
     net_svcs_t       NET_SVCS[MAX_OF_DRV_TYPE][MAX_L4_TYPE];
 
-    GList            *ofpollthr_htbl;
+    adpoll_thread_mgr_t  *oflisten_pollthr_p; /* NULL for client */
+    
+    GList            *ofrw_pollthr_list;
     uint32_t         count_pollthr;
     
 } cc_of_global_t;
+
+extern cc_of_global_t cc_of_global;
 
 #endif //CC_OF_GLOBAL_H

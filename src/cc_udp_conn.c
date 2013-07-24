@@ -1,11 +1,3 @@
-/*
-#include <glib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <errno.h>
-#include <netinet/in.h>
-*/
 #include "cc_of_global.h"
 
 /*
@@ -18,9 +10,9 @@ net_svcs_t udp_sockfns = {
     udp_open_clientfd,
     udp_open_serverfd,
     NULL,
+    udp_close
     udp_read,
     udp_write,
-    udp_close
 };
 
 // Add tcp_sockfns struct to net_svcs_t array in cc_of_global_t

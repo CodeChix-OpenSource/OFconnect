@@ -34,7 +34,7 @@ typedef enum cc_ofrw_state_ {
 
 typdef struct cc_ofrw_key_ {
     int       rw_sockfd;    
-} cc_of_rw_key_t;
+} cc_ofrw_key_t;
 
 /* node in ofrw_htbl */
 typdef struct cc_ofrw_info_ {
@@ -99,16 +99,17 @@ typedef struct cc_of_global_ {
 
     GHashTable       *ofdev_htbl;
     uint32_t         count_devs;
-    //LOCK for htbl
+    GMutex           ofdev_htbl_lock;
 
     GHashTable       *ofchannel_htbl;
     uint32_t         count_ofchannels;
-    //LOCK for htbl
+    GMutex	     ofchannel_htbl_lock;
 
     GHashTable       *ofrw_htbl;
     uint32_t         count_ofrw;
+    GMutex           ofrw_htbl_lock;
     
-    net_svcs_t       NET_SVCS[MAX_OF_DRV_TYPE][MAX_L4_TYPE];
+    net_svcs_t       NET_SVCS[MAX_L4_TYPE];
 
     GList            *ofpollthr_htbl;
     uint32_t         count_pollthr;

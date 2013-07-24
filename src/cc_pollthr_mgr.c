@@ -10,7 +10,7 @@ adp_thr_mgr_new(char *tname,
 {
     int i = 0;
     char send_buf[256];
-    adpoll_thread_mgr_t *this;
+    adpoll_thread_mgr_t *this = NULL;
     adpoll_pollthr_data_t *thread_user_data;
     int tname_len;
 
@@ -74,6 +74,9 @@ void adp_thr_mgr_free(adpoll_thread_mgr_t *this)
 /* Function: adp_thr_mgr_add_del_fd
  * API to create or remove an fd
  * The fd could be either a pipe or a network socket
+ * return value: ADD - the newly created wr pipe is returned
+ *             : DELETE - returns -1.
+ * TBD: add functionality for SOCKET processing
  */
 int
 adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
@@ -529,3 +532,8 @@ adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p)
     free(thr_pvt_p);
 }
 
+uint32_t
+adp_thr_mgr_get_num_avail_sockfd(adpoll_thread_mgr_t *this)
+{
+    return (this->max_sockets - this->num_sockets);
+}

@@ -95,16 +95,17 @@ typedef struct cc_of_global_ {
     /* node: cc_ofdev_info_t */
     GHashTable       *ofdev_htbl;
     uint32_t         count_devs;
-    //LOCK for htbl
+    GMutex           ofdev_htbl_lock;
 
     GHashTable       *ofchannel_htbl;
     uint32_t         count_ofchannels;
-    //LOCK for htbl
+    GMutex	     ofchannel_htbl_lock;
 
     GHashTable       *ofrw_htbl;
     uint32_t         count_ofrw;
+    GMutex           ofrw_htbl_lock;
     
-    net_svcs_t       NET_SVCS[MAX_OF_DRV_TYPE][MAX_L4_TYPE];
+    net_svcs_t       NET_SVCS[MAX_L4_TYPE];
 
     adpoll_thread_mgr_t  *oflisten_pollthr_p; /* NULL for client */
     

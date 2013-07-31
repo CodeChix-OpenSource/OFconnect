@@ -97,10 +97,12 @@ typedef struct cc_of_global_ {
     uint32_t         count_devs;
     //LOCK for htbl
 
+    /* node:  cc_ofchannel_info_t */
     GHashTable       *ofchannel_htbl;
     uint32_t         count_ofchannels;
     //LOCK for htbl
 
+    /*node: cc_ofrw_info_t */
     GHashTable       *ofrw_htbl;
     uint32_t         count_ofrw;
     

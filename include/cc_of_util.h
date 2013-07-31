@@ -17,7 +17,7 @@ cc_get_count_rw_pollthr(void);
 
 
 cc_drv_ret
-cc_get_or_create_rw_pollthr(adpoll_thread_mgr_t *tmgr,
+cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t *tmgr,
                             uint32_t max_sockets,
                             uint32_t max_pipes);
 

@@ -36,13 +36,19 @@ typdef struct cc_ofrw_key_ {
     int       rw_sockfd;    
 } cc_ofrw_key_t;
 
+typedef struct cc_ofstats_ {
+    uint32_t  rx_pkt;
+    uint32_t  tx_pkt;
+    uint32_t  tx_drops;
+} cc_ofstats_t;
+
 /* node in ofrw_htbl */
 typdef struct cc_ofrw_info_ {
     cc_ofrw_key_t        key;
     cc_ofrw_state_e      state;
     adpoll_thread_mgr_t  *thr_mgr_p;
     
-    /* stats */
+
 } cc_ofrw_info_t;
 
 typedef struct cc_ofdev_key_ {
@@ -83,6 +89,7 @@ typedef struct cc_ofchann_info_ {
     cc_ofchannel_key_t    key;
     int                   rw_sockfd;
     int                   count_retries; /* CLIENT: reconnection attempts */
+    cc_ofstats_t          stats;    
 } cc_ofchannel_info_t;
 
 typedef struct cc_of_global_ {
@@ -97,10 +104,12 @@ typedef struct cc_of_global_ {
     uint32_t         count_devs;
     GMutex           ofdev_htbl_lock;
 
+    /* node:  cc_ofchannel_info_t */
     GHashTable       *ofchannel_htbl;
     uint32_t         count_ofchannels;
     GMutex	     ofchannel_htbl_lock;
 
+    /*node: cc_ofrw_info_t */
     GHashTable       *ofrw_htbl;
     uint32_t         count_ofrw;
     GMutex           ofrw_htbl_lock;

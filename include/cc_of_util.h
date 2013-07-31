@@ -6,6 +6,17 @@
 
 #include "cc_pollthr_mgr.h"
 
+typedef enum htbl_update_ops_ {
+    ADD,
+    DEL
+} htbl_update_ops_e;
+
+typedef enum htbl_type_ {
+    OFDEV,
+    OFRW,
+    OFCHANN
+} htbl_type_e;
+
 cc_drv_ret
 cc_create_rw_pollthr(adpoll_thread_mgr_t *tmgr,
                      uint32_t max_sockets,
@@ -17,7 +28,7 @@ cc_get_count_rw_pollthr(void);
 
 
 cc_drv_ret
-cc_get_or_create_rw_pollthr(adpoll_thread_mgr_t *tmgr,
+cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t *tmgr,
                             uint32_t max_sockets,
                             uint32_t max_pipes);
 

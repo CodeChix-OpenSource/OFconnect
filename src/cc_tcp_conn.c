@@ -1,12 +1,3 @@
-/*
-#include <glib.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-//#include <arpa/inet.h>
-#include <string.h>
-#include <errno.h>
-*/
 #include "cc_of_global.h"
 
 /*
@@ -23,12 +14,13 @@ net_svcs_t tcp_sockfns = {
     tcp_open_clientfd,
     tcp_open_listenfd,
     tcp_accept,
+    tcp_close,
     tcp_read,
     tcp_write,
-    tcp_close
 };
 
-// Add tcp_sockfns struct to net_svcs_t array in cc_of_global_t
+// Add tcp_sockfns struct to net_svcs_t array in cc_of_global_t??
+
 
 
 
@@ -36,6 +28,8 @@ int tcp_open_clientfd(char *ipaddr, int port)
 {
     int clientfd;
     struct sockaddr_in serveraddr;
+    cc_ofrw_key_t rw_key;
+    cc_ofrw_info_t rw_info;
 
     if ((clientfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
@@ -53,7 +47,18 @@ int tcp_open_clientfd(char *ipaddr, int port)
 	return -1;
     }
 
-    // Update GHTable with the new fd ??
+    
+    // Update ofrw_htbl
+    rw_key.rw_sockfd = clientfd;    
+    rw_info.key = rw_key;
+    rw_info.state = CC_OF_RW_UP;
+    //rw_info.thr_mgr_p = ?;
+    
+    g_mutex_lock(&ofrw_htbl_lock);
+    g_hash_table_insert(ofrw_htbl, &rw_key, &rw_info);
+    g_mutex_unlock(&ofrw_htbl_lock);
+
+    // Update other two hast tables?
 
     return clientfd;
 }
@@ -98,14 +103,26 @@ int tcp_open_listenfd(char *ipaddr, int port)
 int tcp_accept(int listenfd, struct sockaddr  *clientaddr, int *addrlen)
 {
     int connfd;
+    cc_ofrw_key_t rw_key;
+    cc_ofrw_info_t rw_info;
     
     if ((connfd = accept(listenfd, clientaddr, addrlen)) < 0 ) {
 	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
 	return -1;
     }
     
-    // Update GHTable with the new fd ??
+    // Update ofrw_htbl
+    rw_key.rw_sockfd = connfd;
+    rw_info.key = rw_key;
+    rw_info.state = CC_OF_RW_UP;
+    //rw_info.thr_mgr_p = ?;
 
+    g_mutex_lock(&ofrw_htbl_lock);
+    g_hash_table_insert(ofrw_htbl, &rw_key, &rw_info);
+    g_mutex_unlock(&ofrw_htbl_lock);
+
+    // Update other two hash tables ??
+    
     return connfd;
 }
 
@@ -125,13 +142,21 @@ ssize_t tcp_write(int sockfd, const void *buf, size_t len, int flags)
 int tcp_close(int sockfd)
 {
     int retval;
+    cc_ofrw_key_t rw_key;
+
+    // Update ofrw_htbl
+    rw_key.rw_sockfd = sockfd;
+
+    g_mutex_lock(&ofrw_htbl_lock);
+    g_hash_table_remove(ofrw_htbl, &rw_key);
+    g_mutex_unlock(&ofrw_htbl_lock);
+
+    // Update other two tables??
 
     if ((retval = close(sockfd)) < 0) {
 	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
 	return -1;
     }
-
-    // Update GHTable to remove the sockfd ??
 
     return retval;
 }

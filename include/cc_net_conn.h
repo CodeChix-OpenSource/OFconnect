@@ -20,6 +20,7 @@ typedef enum L4_type_ {
     MAX_L4_TYPE
 } L4_type_e;
 
+// IPV6 not needed...del these ???
 typedef enum addr_type_ {
     IPV4,
     IPV6
@@ -34,14 +35,15 @@ typdef struct ipaddr_v4v6_ {
 } ipaddr_v4v6_t;
 
 typedef struct net_svcs_ {
-    int (*setup_conn)();
-    int (*open_conn)(addr_type_e ip_ver, int *sock_fd);
-    void (*close_conn)(int *sock_fd);
-    int (*connect_conn)(int sock_fd);
-    int (*listen_conn)();
-    int (*accept_conn)();
-    int (*recv_data)();
-    int (*send_data)();
+    int (*open_clientfd)(char *ipaddr, int port);
+    int (*open_serverfd)(char *ipaddr, int port);
+    int (*accept_conn)(int listenfd, struct sockaddr  *clientaddr, 
+	               int *addrlen);
+    int (*close_conn)(int *sockfd);
+    int (*read_data)(int sockfd, void *buf, size_t len, int flags,
+	             struct sockaddr *src_addr, socklen_t *addrlen);
+    int (*write_data)(int sockfd, const void *buf, size_t len, int flags,
+	              const struct sockaddr *dest_addr, socklen_t addrlen);
 } net_svcs_t;
 
 /* sample code to make this work

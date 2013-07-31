@@ -9,9 +9,11 @@
 
 #define CC_LOG_DOMAIN    ("cc_onf_driver_lib")
 
-/* Return Codes */
+/* TODO REPLACE ERR CODES */
+/* Return Codes */ 
 typedef int cc_drv_ret;
 
+/* TODO: remove and */
 #define CC_OK             0
 #define CC_ERR           -1
 

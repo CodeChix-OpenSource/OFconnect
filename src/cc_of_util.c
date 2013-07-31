@@ -91,15 +91,26 @@ cc_pollthr_list_compare_func(adpoll_thread_mgr_t *tmgr1,
     return 0;
 }
 
-cc_drv_ret
-add_ofdev_rwsocket();
-
+/*TODO: update these functions */
 
 cc_drv_ret
-del_ofdev_rwsocket();
+update_global_htbl(htbl_type_e htbl_type,
+                   htbl_update_ops_e htbl_op,
+                   gpointer htbl_key,
+                   gpointer htbl_data)
+{
+    GHashTable *cc_htbl;
+    switch(htbl_type) {
+      case OFDEV:
+        cc_htbl = cc_of_global.ofdev_htbl;
+        break;
+      case OFRW:
+        cc_htbl = c_
+
+}
 
 cc_drv_ret
-add_ofrw_rwsocket();
+_ofrw_rwsocket();
 
 static gboolean
 ofrw_htbl_remove_callback(gpointer key, gpointer value, gpointer user_data)

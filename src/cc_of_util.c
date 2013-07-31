@@ -42,7 +42,7 @@ cc_get_count_rw_pollthr(void)
 }
 
 cc_drv_ret
-cc_get_or_create_rw_pollthr(adpoll_thread_mgr_t *tmgr,
+cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t *tmgr,
                             uint32_t max_sockets,
                             uint32_t max_pipes)
 {
@@ -91,6 +91,61 @@ cc_pollthr_list_compare_func(adpoll_thread_mgr_t *tmgr1,
     return 0;
 }
 
+/*TODO: update these functions */
+
+cc_drv_ret
+update_global_htbl(htbl_type_e htbl_type,
+                   htbl_update_ops_e htbl_op,
+                   gpointer htbl_key,
+                   gpointer htbl_data)
+{
+    GHashTable *cc_htbl;
+    switch(htbl_type) {
+      case OFDEV:
+        cc_htbl = cc_of_global.ofdev_htbl;
+        break;
+      case OFRW:
+        cc_htbl = c_
+
+}
+
+cc_drv_ret
+_ofrw_rwsocket();
+
+static gboolean
+ofrw_htbl_remove_callback(gpointer key, gpointer value, gpointer user_data)
+{
+    cc_ofrw_key_t *ofrw_key;
+    ofrw_key = (cc_ofrw_key_t *)key;
+
+    if (ofrw_key->rw_sockfd == *(int *)user_data) {
+        return TRUE;
+    }
+    return FALSE;
+}
+
+guint
+del_ofrw_rwsocket(int del_fd)
+{
+    return(g_hash_table_foreach_remove(cc_of_global.ofrw_htbl,
+                                       (GHRFunc) del_ofrw_rwsocket,
+                                       (gpointer) &del_fd));
+}                                        
+
+cc_drv_ret
+add_ofchann_rwsocket(cc_ofchannel_key_t key,
+                     int rwsock)
+{
+    
+
+}
+
+cc_drv_ret
+del_ofchann_rwsocket(int rwsock);
+
+cc_drv_net
+del_ofchann(cc_ofchannel_key_t key);
+
 cc_drv_ret
 cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, int fd)
 {
@@ -117,6 +172,9 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, int fd)
         (GCompareFunc)cc_pollthr_list_compare_func);
 
     /* TODO: clean out this fd from global structures */
+//    ofrw_socket_list in device
+//    cc_of_global.ofrw_htbl - cc_ofrw_info_t
+    //delete from ofchannel_htbl - cc_ofchannel_info_t
 
     return (CC_OK);
 

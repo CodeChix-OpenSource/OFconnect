@@ -6,13 +6,17 @@
 
 //error codes
 #define CC_OF_OK      0
-#define CC_OF_EEXIST  -1
-#define CC_OF_EINVAL  -2
+#define CC_OF_EEXIST  -1 /* already exists */
+#define CC_OF_EINVAL  -2 /* invalid attribute */
 #define CC_OF_EAGAIN  -3 /* retry */
-#define CC_OF_ENOMEM  -4
+#define CC_OF_ENOMEM  -4 /* malloc or other mem max */
 #define CC_OF_MDEV    -5 /* max out on dev */
-#define CC_OF_MCHANN  -6 /* max out on channels */
-#define CC_OF_ECHANN  -7 /* unable to establish socket */
+#define CC_OF_EHTBL   -6 /* hash table failures */
+#define CC_OF_MCHANN  -7 /* max out on channels */
+#define CC_OF_ECHANN  -8 /* unable to establish socket */
+#define CC_OF_EGEN    -9 /* misc error */
+
+typedef int cc_of_ret;
 
 /**
  * cc_of_lib_init

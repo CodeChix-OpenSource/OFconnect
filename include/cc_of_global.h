@@ -18,8 +18,8 @@
 #include "cc_log.h"
 #include "cc_pollthr_mgr.h"
 
-#define SIZE_RW_THREAD_BUCKET        10
-#define MAX_PER_THREAD_RWSOCKETS     100
+#define SIZE_RW_THREAD_BUCKET        20
+#define MAX_PER_THREAD_RWSOCKETS     200
 
 typedef enum of_dev_type_ {
     SWITCH = 0,

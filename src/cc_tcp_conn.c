@@ -19,12 +19,9 @@ net_svcs_t tcp_sockfns = {
     tcp_write,
 };
 
-// Add tcp_sockfns struct to net_svcs_t array in cc_of_global_t??
+extern tcp_sockfns;
 
-
-
-
-int tcp_open_clientfd(char *ipaddr, int port)
+in tcp_open_clientfd(char *ipaddr, int port)
 {
     int clientfd;
     struct sockaddr_in serveraddr;

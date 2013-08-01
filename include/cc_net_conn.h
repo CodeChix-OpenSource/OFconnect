@@ -26,13 +26,16 @@ typedef enum addr_type_ {
     IPV6
 } addr_type_e;
 
-typdef struct ipaddr_v4v6_ {
+/*typedef struct ipaddr_v4v6_ {
     addr_type_e  ipaddr_type;
     union {
         uint32_t ipv4_addr;
         uint32_t ipv6_addr[4];
     } u;
-} ipaddr_v4v6_t;
+} ipaddr_v4v6_t;*/
+
+typedef uint32 ipaddr_v4_t;
+typedef ipv4_addr_t ipaddr_v4v6_t;
 
 typedef struct net_svcs_ {
     int (*open_clientfd)(char *ipaddr, int port);

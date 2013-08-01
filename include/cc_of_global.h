@@ -44,7 +44,6 @@ typedef struct cc_ofstats_ {
 
 /* node in ofrw_htbl */
 typdef struct cc_ofrw_info_ {
-    cc_ofrw_key_t        key;
     cc_ofrw_state_e      state;
     adpoll_thread_mgr_t  *thr_mgr_p;
     
@@ -65,15 +64,14 @@ typedef enum cc_ofver_ {
 
 /* node in ofdev_htbl */
 typedef struct cc_ofdev_info_ {
-    cc_ofdev_key_t key;
-
     uint16_t       controller_L4_port;
 
     cc_ofver_e     of_max_ver;
     
-    uint32_t       count_rwsockets;
     GList          *ofrw_socket_list; //list of rw sockets
-    //LOCK for htbl
+    GMutex	    ofrw_socket_list_lock;
+
+    cc_onf_recv_pkt recv_func;
 
     int            main_sockfd;
 } cc_ofdev_info_t;
@@ -86,32 +84,28 @@ typedef struct cc_ofchannel_key_ {
 }cc_ofchannel_key_t;
 
 typedef struct cc_ofchann_info_ {
-    cc_ofchannel_key_t    key;
     int                   rw_sockfd;
     int                   count_retries; /* CLIENT: reconnection attempts */
     cc_ofstats_t          stats;    
 } cc_ofchannel_info_t;
 
 typedef struct cc_of_global_ {
-    /* driver type could be controller or switch */
+    /* driver type could be client or server */
     of_drv_type_e     ofdrv_type;
 
-    /* layer4 device type could be client or server */
+    /* layer4 device type could be switch or controller */
     of_dev_type_e     ofdev_type;
 
     /* node: cc_ofdev_info_t */
     GHashTable       *ofdev_htbl;
-    uint32_t         count_devs;
     GMutex           ofdev_htbl_lock;
 
     /* node:  cc_ofchannel_info_t */
     GHashTable       *ofchannel_htbl;
-    uint32_t         count_ofchannels;
     GMutex	     ofchannel_htbl_lock;
 
     /*node: cc_ofrw_info_t */
     GHashTable       *ofrw_htbl;
-    uint32_t         count_ofrw;
     GMutex           ofrw_htbl_lock;
     
     net_svcs_t       NET_SVCS[MAX_L4_TYPE];
@@ -119,8 +113,6 @@ typedef struct cc_of_global_ {
     adpoll_thread_mgr_t  *oflisten_pollthr_p; /* NULL for client */
     
     GList            *ofrw_pollthr_list;
-    uint32_t         count_pollthr;
-    
 } cc_of_global_t;
 
 extern cc_of_global_t cc_of_global;

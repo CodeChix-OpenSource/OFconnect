@@ -1,8 +1,8 @@
 /*-----------------------------------------------------------------------------*/
 /* Copyright: CodeChix Bay Area Chapter 2013                                   */
 /*-----------------------------------------------------------------------------*/
-#ifndef CC_OF_API_H
-#define CC_OF_API_H
+#ifndef CC_OF_LIB_H
+#define CC_OF_LIB_H
 
 //error codes
 #define CC_OF_OK      0
@@ -44,7 +44,7 @@ int
 cc_of_dev_register(cc_ofdev_key_t dev_key,
                    uint16_t layer4_port,
                    cc_ofver_e max_ofver,
-                   cc_onf_recv_pkt /*func ptr*/);
+                   cc_onf_recv_pkt recv_func /*func ptr*/);
 /* possible additional fields for TLS certificate */
 
 int

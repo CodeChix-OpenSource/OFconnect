@@ -46,8 +46,6 @@ typedef struct cc_ofstats_ {
 typdef struct cc_ofrw_info_ {
     cc_ofrw_state_e      state;
     adpoll_thread_mgr_t  *thr_mgr_p;
-    
-
 } cc_ofrw_info_t;
 
 typedef struct cc_ofdev_key_ {

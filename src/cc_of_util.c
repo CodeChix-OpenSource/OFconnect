@@ -179,9 +179,9 @@ del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
 
     g_mutex_lock(&ofdev->ofrw_socket_list_lock);
     ofdev_ofrw_socket_list = g_list_remove(ofdev->ofrw_socket_list,
-                                           rwsock);
+                                           &rwsock);
     g_mutex_unlock(&ofdev->ofrw_socket_list_lock);
-
+    
     return(update_global_htbl(OFDEV, ADD, key, ofdev, &new_entry));
 }
 
@@ -210,7 +210,7 @@ cc_create_rw_pollthr(uint32_t max_sockets,
 
     if (tmgr == NULL) {
         CC_LOG_ERROR("%s(%d): failed to create new poll thread for rw");
-        return(CC_ERR);
+        return(CC_OF_EGEN);
     }
 
     /* update the global GList */
@@ -221,7 +221,7 @@ cc_create_rw_pollthr(uint32_t max_sockets,
                  __FUNCTION__, __LINE__, tname,
                  cc_get_count_rw_pollthr());
 
-    return(CC_OK);
+    return(CC_OF_OK);
 }
 
 
@@ -256,7 +256,7 @@ cc_find_or_create_rw_pollthr(uint32_t max_sockets, /* used for create */
     
     tmgr = (adpoll_thread_mgr_t *)(elem);
     
-    return(CC_OK);
+    return(CC_OF_OK);
 }
 
 gint
@@ -292,7 +292,7 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, int fd)
         /* no sorting required with only 1 thread */
         CC_LOG_DEBUG("%s(%d): only one poll thread. skip sorting",
                      __FUNCTION__, __LINE__);
-        return(CC_OK);
+        return(CC_OF_OK);
     }
 
     cc_of_global.ofrw_pollthr_list = g_list_remove(cc_of_global.ofrw_pollthr_list,
@@ -307,7 +307,7 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, int fd)
 //    cc_of_global.ofrw_htbl - cc_ofrw_info_t
     //delete from ofchannel_htbl - cc_ofchannel_info_t
 
-    return (CC_OK);
+    return (CC_OF_OK);
 
 }
 

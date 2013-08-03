@@ -58,7 +58,7 @@ int
 cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type,
 	               cc_ofver_e max_ofver_supported)
 {
-    cc_drv_ret status = CC_OF_OK;
+    cc_of_ret status = CC_OF_OK;
 
     // Initialize cc_of_global
     cc_of_global.ofdrv_type = drv_type;
@@ -90,7 +90,7 @@ cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type,
 
     cc_of_global.oflisten_pollthr_p = adp_thr_mgr_new("oflisten_thr", MAX_PER_THREAD_RWSOCKETS, MAX_PIPE_PER_THR_MGR);
     if (cc_of_global.oflisten_pollthr_p == NULL) {
-	status = CC_OF_ERR;
+	status = CC_OF_EGEN;
 	CC_LOG_FATAL("%s(%d): %s", __FUNCTION__, __LINE__, strerror(status));
     }
     cc_of_global.ofrw_pollthr_list = NULL;
@@ -105,7 +105,7 @@ cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type,
 
 
 int cc_of_dev_register(cc_ofdev_key_t dev_key, uint16_t layer4_port, cc_ofver_e max_ofver, cc_onf_recv_pkt recv_func) {
-    cc_drv_ret status = CC_OF_OK;
+    cc_of_ret status = CC_OF_OK;
     cc_ofdev_info_t *cc_ofdev;
     char switch_ip[INET_ADDRSTRLEN];
     char controller_ip[INET_ADDRSTRLEN]; 

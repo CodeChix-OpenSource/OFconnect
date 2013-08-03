@@ -9,16 +9,6 @@
 
 #define CC_LOG_DOMAIN    ("cc_onf_driver_lib")
 
-/* TODO REPLACE ERR CODES */
-/* Return Codes */ 
-typedef int cc_drv_ret;
-
-/* TODO: remove and */
-#define CC_OK             0
-#define CC_ERR           -1
-
-
-
 #define CC_LOG_ENABLE_DEBUGS()                     \
     {                                              \
         g_setenv("G_MESSAGES_DEBUG", "all", TRUE); \

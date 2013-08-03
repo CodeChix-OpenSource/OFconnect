@@ -25,7 +25,7 @@ int udp_open_clientfd(char *ipaddr, int port)
     struct sockaddr_in serveraddr;
 
     if ((clientfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
+        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(errno));
 	return -1;
     }
 
@@ -42,13 +42,13 @@ int udp_open_serverfd(char *ipaddr, int port)
     struct sockaddr_in serveraddr;
 
     if ((serverfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
+	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(errno));
 	return -1;
     }
 
     // To prevent "Address already in use" error from bind
     if (setsockopt(serverfd, SOL_SOCKET,SO_REUSEADDR, (const void *)&optval, sizeof(int)) < 0) {
-	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
+	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(errno));
 	return -1;
     }
 
@@ -58,7 +58,7 @@ int udp_open_serverfd(char *ipaddr, int port)
     inet_aton(ipaddr, &serveraddr.sin_addr.s_addr);
     
     if (bind(serverfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) < 0) {
-	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
+	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(errno));
 	return -1;
     }
 
@@ -85,7 +85,7 @@ int udp_close(int sockfd)
     int retval;
 
     if ((retval = close(sockfd)) < 0) {
-	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
+	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(errno));
 	return -1;
     }
 

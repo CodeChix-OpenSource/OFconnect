@@ -16,6 +16,33 @@
 #define CC_OF_ECHANN  -8 /* unable to establish socket */
 #define CC_OF_EGEN    -9 /* misc error */
 
+static const char * cc_of_errtable[] = {
+    "okay",
+    "already exists",
+    "invalid attribute",
+    "retry",
+    "out of memory",
+    "max out on devices",
+    "hash table failures",
+    "max out on channels",
+    "unable to establish sockets",
+    "misc error",
+};
+
+#define CC_OF_ERRTABLE_SIZE (sizeof(cc_of_errtable) / sizeof(cc_of_errtabe[0]))
+
+inline char *cc_of_strerror(int errnum)
+{
+    if(errnum > 0) {
+	return "Invalid errnum";
+    } else if (errnum <= -CC_OF_ERRTABLE_SIZE){
+	return "Unknown error";
+    } else {
+	return cc_of_errtable[-errnum];
+    }
+}
+
+
 typedef int cc_of_ret;
 
 /**
@@ -43,6 +70,9 @@ cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type,
 
 int
 cc_of_lib_free(void);
+
+int 
+cc_of_lib_abort(void);
 
 int
 cc_of_dev_register(cc_ofdev_key_t dev_key,

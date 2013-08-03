@@ -1,12 +1,5 @@
 #include "cc_of_global.h"
 
-/*
- * Note: This file will not compile right now. I still need to integrate this
- * and make some changes in the data strutures defined in cc_of_global.h 
- * I update this file with comments at places where integration is necessary.
- */
-
-
 // Number of backlog connection requests
 #define LISTENQ 1024
 
@@ -29,7 +22,7 @@ in tcp_open_clientfd(char *ipaddr, int port)
     cc_ofrw_info_t rw_info;
 
     if ((clientfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
+        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(errno));
 	return -1;
     }
 
@@ -40,7 +33,7 @@ in tcp_open_clientfd(char *ipaddr, int port)
 
     // Establish connection with server
     if (connect(clientfd, (struct sockaddr *) &serveraddr, sizeof(serveraddr)) < 0) {
-	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
+	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(errno));
 	return -1;
     }
 
@@ -48,7 +41,7 @@ in tcp_open_clientfd(char *ipaddr, int port)
     // Update ofrw_htbl
     rw_key.rw_sockfd = clientfd;    
     rw_info.key = rw_key;
-    rw_info.state = CC_OF_RW_UP;
+    rw_info.state = CC_OF_RW_DOWN;
     //rw_info.thr_mgr_p = ?;
     
     g_mutex_lock(&ofrw_htbl_lock);
@@ -68,13 +61,13 @@ int tcp_open_listenfd(char *ipaddr, int port)
     struct sockaddr_in serveraddr;
 
     if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
+	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(errno));
 	return -1;
     }
 
     // To prevent "Address already in use" error from bind
     if (setsockopt(listenfd, SOL_SOCKET,SO_REUSEADDR, (const void *)&optval, sizeof(int)) < 0) {
-	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
+	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(errno));
 	return -1;
     }
 
@@ -84,12 +77,12 @@ int tcp_open_listenfd(char *ipaddr, int port)
     inet_aton(ipaddr, &serveraddr.sin_addr.s_addr);
     
     if (bind(listenfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) < 0) {
-	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
+	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(errno));
 	return -1;
     }
 
     if (listen(listenfd, LISTENQ) < 0) {
-	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
+	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(errno));
 	return -1;
     }
 
@@ -104,14 +97,14 @@ int tcp_accept(int listenfd, struct sockaddr  *clientaddr, int *addrlen)
     cc_ofrw_info_t rw_info;
     
     if ((connfd = accept(listenfd, clientaddr, addrlen)) < 0 ) {
-	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
+	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(errno));
 	return -1;
     }
     
     // Update ofrw_htbl
     rw_key.rw_sockfd = connfd;
     rw_info.key = rw_key;
-    rw_info.state = CC_OF_RW_UP;
+    rw_info.state = CC_OF_RW_DOWN;
     //rw_info.thr_mgr_p = ?;
 
     g_mutex_lock(&ofrw_htbl_lock);
@@ -151,7 +144,7 @@ int tcp_close(int sockfd)
     // Update other two tables??
 
     if ((retval = close(sockfd)) < 0) {
-	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
+	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(errno));
 	return -1;
     }
 

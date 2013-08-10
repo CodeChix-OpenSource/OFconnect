@@ -86,6 +86,10 @@
 #define PRI_PIPE_RD_FD 0
 #define PRI_PIPE_WR_FD 1
 
+/* Index of send-data pipes in pipes_arr */
+#define DATA_PIPE_RD_FD 2
+#define DATA_PIPE_WR_FD 3
+
 /* Index offsets for read and write pipes */
 #define RD_OFFSET      0
 #define WR_OFFSET      1
@@ -120,6 +124,8 @@ typedef struct adpoll_thread_mgr {
     GThread       *thread_p;
     GMutex        del_pipe_cv_mutex;
     GCond         del_pipe_cv_cond;
+    GMutex        adp_thr_init_cv_mutex;
+    GCond         adp_thr_init_cv_cond;
 } adpoll_thread_mgr_t;
 
 /* parameter for starting new thread manager */
@@ -129,7 +135,8 @@ typedef struct adpoll_pollthr_data_ {
     int primary_pipe_rd_fd;
     GMutex  *del_pipe_cv_mutex_p;
     GCond   *del_pipe_cv_cond_p;
-    
+    GMutex  *adp_thr_init_cv_mutex_p;
+    GCond   *adp_thr_init_cv_cond_p;
 } adpoll_pollthr_data_t;
 
 /* message sent via pipe from thread manager to poll thread */
@@ -173,8 +180,11 @@ int adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
 
 int adp_thr_mgr_get_num_fds(adpoll_thread_mgr_t *this);
 
-void adp_thr_mgr_get_pri_pipe(adpoll_thread_mgr_t *this,
-                              int *main_pipe); /* 2 fds returned */
+/* return value: write pipe fd */
+int adp_thr_mgr_get_pri_pipe_wr(adpoll_thread_mgr_t *this);
+
+/* return value: write pipe fd */
+int adp_thr_mgr_get_data_pipe_wr(adpoll_thread_mgr_t *this);
 
 uint32_t adp_thr_mgr_get_num_avail_sockfd(adpoll_thread_mgr_t *this);
 

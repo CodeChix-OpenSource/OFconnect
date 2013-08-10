@@ -13,6 +13,7 @@ adp_thr_mgr_new(char *tname,
     adpoll_thread_mgr_t *this = NULL;
     adpoll_pollthr_data_t *thread_user_data;
     int tname_len;
+    adpoll_thr_msg_t add_datapipe_msg;    
 
     this = (adpoll_thread_mgr_t *)malloc(sizeof(adpoll_thread_mgr_t));
     
@@ -27,10 +28,10 @@ adp_thr_mgr_new(char *tname,
     tname_len = i + 1;
     
     this->max_sockets = max_sockets;
-    this->max_pipes = max_pipes;
+    this->max_pipes = max_pipes + 2; /* 2 additional for internal use */
     this->num_pipes = 0;
 
-    this->pipes_arr = (int *)malloc(sizeof(int) * 2 * max_pipes);
+    this->pipes_arr = (int *)malloc(sizeof(int) * 2 * this->max_pipes);
 
     /* create pipe - read is in location 0 and write in 1 */
     if (pipe(this->pipes_arr) == -1) {
@@ -44,7 +45,7 @@ adp_thr_mgr_new(char *tname,
                  this->pipes_arr[0], this->pipes_arr[1]);
 
     strncpy(thread_user_data->tname, this->tname, tname_len);
-    thread_user_data->max_pollfds = max_sockets + max_pipes;
+    thread_user_data->max_pollfds = max_sockets + this->max_pipes;
     thread_user_data->primary_pipe_rd_fd = this->pipes_arr[PRI_PIPE_RD_FD];
     thread_user_data->del_pipe_cv_mutex_p = &(this->del_pipe_cv_mutex);
     thread_user_data->del_pipe_cv_cond_p = &(this->del_pipe_cv_cond);
@@ -52,6 +53,20 @@ adp_thr_mgr_new(char *tname,
     this->thread_p = g_thread_new(this->tname,
                             (GThreadFunc) adp_thr_mgr_poll_thread_func,
                             thread_user_data);
+    
+    /* synchronize with thr_mgr_poll_thread_func */
+    g_mutex_lock(&this->adp_thr_init_cv_mutex);
+    g_cond_wait(&this->adp_thr_init_cv_cond,
+                &this->adp_thr_init_cv_mutex);                
+    g_mutex_unlock(&this->adp_thr_init_cv_mutex);
+    
+    add_datapipe_msg.fd_type = PIPE;
+    add_datapipe_msg.fd_action = ADD;
+    add_datapipe_msg.poll_events = POLLIN;
+    add_datapipe_msg.pollin_func = NULL;
+    add_datapipe_msg.pollout_func = NULL;
+
+    adp_thr_mgr_add_del_fd(this, &add_datapipe_msg);
     return this;
 }
 
@@ -119,8 +134,8 @@ adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
             gboolean found = FALSE;
             CC_LOG_DEBUG("%s(%d):pipe %d DELETE", __FUNCTION__, __LINE__,
                          msg->fd);
-            if ((msg->fd == PRI_PIPE_RD_FD) ||
-                (msg->fd == PRI_PIPE_WR_FD)) {
+            if ((msg->fd == this->pipes_arr[PRI_PIPE_RD_FD]) ||
+                (msg->fd == this->pipes_arr[PRI_PIPE_WR_FD])) {
 
                 /* Update the message to send to poll thr */
                 msg->fd = this->pipes_arr[PRI_PIPE_RD_FD];
@@ -131,10 +146,28 @@ adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
 
                 write(this->pipes_arr[PRI_PIPE_WR_FD],
                           msg, sizeof(adpoll_thr_msg_t));
-                
+
+                /* TBD: cleanup adp_thr_mgr_free?*/
                 return retval;
             }
 
+            if ((msg->fd == this->pipes_arr[DATA_PIPE_RD_FD]) ||
+                (msg->fd == this->pipes_arr[DATA_PIPE_WR_FD])) {
+
+                /* Update the message to send to poll thr */
+                msg->fd = this->pipes_arr[DATA_PIPE_RD_FD];
+                
+                CC_LOG_DEBUG("%s(%d): sending fd DEL to poll thr on fd %d",
+                             __FUNCTION__, __LINE__,
+                             this->pipes_arr[DATA_PIPE_WR_FD]);
+
+                write(this->pipes_arr[PRI_PIPE_WR_FD],
+                          msg, sizeof(adpoll_thr_msg_t));
+
+                /* TBD: cleanup */
+                return retval;
+            }
+            
             for (i = 0; i < this->num_pipes; i++) {
                 if (this->pipes_arr[i] == msg->fd) {
                     del_rd_fd_index = i;
@@ -151,23 +184,22 @@ adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
                     /* Update the message to send to poll thr */
                     msg->fd = this->pipes_arr[del_rd_fd_index];
 
-                    /* TBD: change this to primary pipe */
                     /* process error return */
                     CC_LOG_DEBUG("%s(%d): sending fd DEL to poll thr on fd %d",
                                  __FUNCTION__, __LINE__,
                                  this->pipes_arr[PRI_PIPE_WR_FD]);
                     
-                    write(this->pipes_arr[del_rd_fd_index + WR_OFFSET],
-                          msg, sizeof(adpoll_thr_msg_t));
-
-//                    write(this->pipes_arr[PRI_PIPE_WR_FD],
+//                    write(this->pipes_arr[del_rd_fd_index + WR_OFFSET],
 //                          msg, sizeof(adpoll_thr_msg_t));
+
+                    write(this->pipes_arr[PRI_PIPE_WR_FD],
+                          msg, sizeof(adpoll_thr_msg_t));
                     
                     //cond wait for thread to delete the fds
                     g_mutex_lock(&this->del_pipe_cv_mutex);
                     g_cond_wait(&this->del_pipe_cv_cond,
                                 &this->del_pipe_cv_mutex);
-                    g_mutex_lock(&this->del_pipe_cv_mutex);
+                    g_mutex_unlock(&this->del_pipe_cv_mutex);
                     
                     close(this->pipes_arr[del_rd_fd_index]);
                     close(this->pipes_arr[del_rd_fd_index + WR_OFFSET]);
@@ -180,6 +212,13 @@ adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
                     break;
                 }
             }
+        }
+    } else if (msg->fd_type == SOCKET) {
+        if (msg->fd_action == ADD) {
+            CC_LOG_DEBUG("%s(%d) socket ADD", __FUNCTION__, __LINE__);
+
+        } else if (msg->fd_action == DELETE) {
+            CC_LOG_DEBUG("%s(%d) socket ADD", __FUNCTION__, __LINE__);
         }
     }
     return retval;
@@ -317,8 +356,10 @@ pollthr_pipe_process_func(char *tname,
           if (msg.fd_type == PIPE) {
               CC_LOG_DEBUG("%s(%d): pipe DELETE", __FUNCTION__, __LINE__);
 
-              if (msg.fd == thr_pvt_p->pollfd_arr[0].fd) {
-                  CC_LOG_DEBUG("%s(%d): Received DEL on primary read FD",
+              if ((msg.fd == thr_pvt_p->pollfd_arr[0].fd) ||
+                  (msg.fd == thr_pvt_p->pollfd_arr[1].fd)) {
+                  CC_LOG_DEBUG("%s(%d): Received DEL on primary pipe FD "
+                               "or data pipe FD - SELF DESTRUCT",
                                __FUNCTION__, __LINE__);
 
                   thr_pvt_p->num_pollfds = 0;
@@ -468,6 +509,12 @@ adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p)
                  __FUNCTION__, __LINE__, pollthr_name,
                  thr_pvt_p->pollfd_arr[0].fd);
 
+    /* synchronize completion of thread initialization */
+    g_mutex_lock(pollthr_data_p->adp_thr_init_cv_mutex_p);
+    g_cond_signal(pollthr_data_p->adp_thr_init_cv_cond_p,
+                  pollthr_data_p->adp_thr_init_cv_mutex_p);
+    g_mutex_unlock(pollthr_data_p->adp_thr_init_cv_mutex_p);
+
     for( ; ; ) {
         CC_LOG_DEBUG("%s(%d)[%s] before poll",
                      __FUNCTION__, __LINE__,
@@ -536,4 +583,19 @@ uint32_t
 adp_thr_mgr_get_num_avail_sockfd(adpoll_thread_mgr_t *this)
 {
     return (this->max_sockets - this->num_sockets);
+}
+
+/* return value: write pipe fd */
+int
+adp_thr_mgr_get_pri_pipe_wr(adpoll_thread_mgr_t *this)
+{
+    return(this->pipes_arr[PRI_PIPE_WR_FD]);
+}
+
+
+/* return value: write pipe fd */
+int
+adp_thr_mgr_get_data_pipe_wr(adpoll_thread_mgr_t *this)
+{
+    return(this->pipes_arr[DATA_PIPE_WR_FD]);
 }

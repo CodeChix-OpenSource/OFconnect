@@ -169,6 +169,8 @@ cc_of_ret
 del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
 {
     cc_ofdev_info_t *ofdev = NULL;
+    GList *tmp_list = NULL;
+    int *tmp_rwsock = NULL;
     gboolean new_entry;
 
     ofdev = g_hash_table_lookup(cc_of_global.ofdev_htbl,
@@ -178,8 +180,19 @@ del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
     }
 
     g_mutex_lock(&ofdev->ofrw_socket_list_lock);
-    ofdev_ofrw_socket_list = g_list_remove(ofdev->ofrw_socket_list,
-                                           &rwsock);
+    tmp_list = g_list_find(ofdev->ofrw_socket_list, &rwsock);
+    if (tmp_list == NULL) {
+        CC_LOG_ERROR("%s(%d): could not find rwsock %d "
+                     "in ofrw_socket_list",
+                     __FUNCTION__, __LINE__, rwsock);
+        g_mutex_unlock(&ofdev->ofrw_socket_list_lock);
+        return(CC_OF_EGEN);
+    }
+
+    tmp_rwsock = (int *)tmp_list->data;
+    ofdev_ofrw_socket_list = g_list_delete_link(ofdev->ofrw_socket_list,
+                                                tmp_list);
+    free(tmp_rwsock);
     g_mutex_unlock(&ofdev->ofrw_socket_list_lock);
     
     return(update_global_htbl(OFDEV, ADD, key, ofdev, &new_entry));
@@ -281,6 +294,8 @@ cc_of_ret
 cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, int fd)
 {
     adpoll_thr_msg_t del_fd_msg;
+    GList *tmp_list = NULL;
+    adpoll_thread_mgr_t *tmp_tmgr = NULL;
     
     del_fd_msg.fd_type = SOCKET;
     del_fd_msg.fd_action = DELETE;
@@ -295,8 +310,18 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, int fd)
         return(CC_OF_OK);
     }
 
-    cc_of_global.ofrw_pollthr_list = g_list_remove(cc_of_global.ofrw_pollthr_list,
-                                                   tmgr);
+    tmp_list = g_list_find(cc_of_global.ofrw_pollthr_list, tmgr);
+    if (tmp_list == NULL) {
+        CC_LOG_ERROR("%s(%d): could not find thread manager %s "
+                     "in ofrw_pollthr_list",
+                     __FUNCTION__, __LINE__, tmgr->tname);
+        return(CC_OF_EGEN);
+    }
+    tmp_tmgr = (adpoll_thread_mgr_t *)tmp_list->data;
+    cc_of_global.ofrw_pollthr_list =
+        g_list_delete_link(cc_of_global.ofrw_pollthr_list, tmp_list);
+    free(tmp_tmgr);
+    
     cc_of_global.ofrw_pollthr_list = g_list_insert_sorted(
         cc_of_global.ofrw_pollthr_list,
         tmgr,

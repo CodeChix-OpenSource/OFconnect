@@ -1,54 +1,58 @@
 CC     := gcc
-CFLAGS := -I/usr/include/glib-2.0 -I/usr/lib/glib-2.0/include -Wall -Wextra -g # -fpic vs -fPIC ??
+
 LDFLAGS:= -shared
 LIBS   := -lglib-2.0
 RM     := rm -f
 
 TARGET_LIB = libccof.so
 
+MAKE    := make
 ROOTDIR := $(CURDIR)
-#ROOTDIR := /Users/edeedhu/hub/forked/CC-ONF-driver
 SRCDIR  := $(ROOTDIR)/src
 INCLDIR := $(ROOTDIR)/include
 TESTDIR := $(ROOTDIR)/tests
 OBJDIR  := $(ROOTDIR)/obj
 DOCDIR  := $(ROOTDIR)/doc
 
-
+INCLUDES := -I$(ROOTDIR)/include
 SRCS     := $(wildcard $(SRCDIR)/*.c)
-OBJS     := $(SRCS:%.c=%.o)
+OBJS     := $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCS))
 
-.PHONY: all
-all: $(TARGET_LIB)
-#------------------------------
-#$(OBJS):$(SRCS)
-#	$(CC) $(CFLAGS) $< $@
+CFLAGS := -I/usr/include/glib-2.0 -I/usr/lib/glib-2.0/include \
+	  $(INCLUDES) -Wall -Wextra -g # -fpic vs -fPIC ??
 
-#$(OBJS): | $(OBJDIR)
 
-#$(OBJDIR):
-#	mkdir $(OBJDIR)
-#------------------------------
+.PHONY: objects
+objects: $(OBJS)
 
-#$(TARGET_LIB):$(OBJS)
-#	$(CC) $(LDFLAGS) -o $@ $^
+$(OBJS): | $(OBJDIR)
 
-#$(SRCS:.c=.d):%.d:%.c
-#	$(CC) $(CFLAGS) -MM $@ $<
-#include $(SRCS:.c=.o)
+$(OBJDIR): 
+	mkdir $(OBJDIR)
 
-#$(OBJS):$(SRCS)
-#	$(CC) $(INCLUDES) $(CFLAGS) -o $(OBJS) -c $(SRCS)
-
-$(SRCS .c.o):
+$(OBJS) : $(SRCS)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+
+.PHONY: dryrun
+dryrun:
+	@echo "$(CC) $(CFLAGS)"
+	@echo "$(OBJS)"
+
+
+.PHONY: tlib
+tlib: $(TARGET_LIB)
 
 $(TARGET_LIB):$(OBJS)
 	$(CC) $(LIBS) $(LDFLAGS) $(OBJS) -o $(TARGET_LIB) 
 
-#$(OBJS): $(SRCS)
-#	$(CC) $(CFLAGS) -o $@ -c $<
+.PHONY: all
+all:
+	$(MAKE) objects
+	$(MAKE) tlib
+
 
 .PHONY: clean
 clean: 
 	$(RM) $(TARGET_LIB) $(OBJS)
+	$(RM) -r $(OBJDIR)

@@ -61,7 +61,7 @@ adp_thr_mgr_new(char *tname,
     g_mutex_unlock(&this->adp_thr_init_cv_mutex);
     
     add_datapipe_msg.fd_type = PIPE;
-    add_datapipe_msg.fd_action = ADD;
+    add_datapipe_msg.fd_action = ADD_FD;
     add_datapipe_msg.poll_events = POLLIN;
     add_datapipe_msg.pollin_func = NULL;
     add_datapipe_msg.pollout_func = NULL;
@@ -100,7 +100,7 @@ adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
     int i, j, retval = -1;
     CC_LOG_DEBUG("%s(%d)", __FUNCTION__, __LINE__);
     if (msg->fd_type == PIPE) {
-        if (msg->fd_action == ADD) {
+        if (msg->fd_action == ADD_FD) {
             CC_LOG_DEBUG("%s(%d) pipe ADD", __FUNCTION__,
                          __LINE__);
             CC_LOG_DEBUG("%s(%d) this->num_pipes is %d",
@@ -128,7 +128,7 @@ adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
 
             retval = this->pipes_arr[this->num_pipes - 2 + WR_OFFSET];
             
-        } else if (msg->fd_action == DELETE) {
+        } else if (msg->fd_action == DELETE_FD) {
             /* find this fd in pipes_arr */
             int del_rd_fd_index;
             gboolean found = FALSE;
@@ -214,10 +214,10 @@ adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
             }
         }
     } else if (msg->fd_type == SOCKET) {
-        if (msg->fd_action == ADD) {
+        if (msg->fd_action == ADD_FD) {
             CC_LOG_DEBUG("%s(%d) socket ADD", __FUNCTION__, __LINE__);
 
-        } else if (msg->fd_action == DELETE) {
+        } else if (msg->fd_action == DELETE_FD) {
             CC_LOG_DEBUG("%s(%d) socket ADD", __FUNCTION__, __LINE__);
         }
     }
@@ -305,7 +305,7 @@ pollthr_pipe_process_func(char *tname,
                 msg.pollout_func);
 
     switch (msg.fd_action) {
-      case ADD:
+      case ADD_FD:
       {
 
           CC_LOG_DEBUG("%s(%d): pipe ADD %d of type %d of action %d",
@@ -349,7 +349,7 @@ pollthr_pipe_process_func(char *tname,
           break;
           
       }
-      case DELETE:
+      case DELETE_FD:
       {
           gboolean found = FALSE;
           int del_index;
@@ -436,7 +436,7 @@ pollthr_pipe_process_func(char *tname,
           break;
       }
       default:
-        CC_LOG_FATAL("%s(%d): neither ADD nor DELETE",
+        CC_LOG_FATAL("%s(%d): neither ADD_FD nor DELETE_FD",
                      __FUNCTION__, __LINE__);
     }
 }

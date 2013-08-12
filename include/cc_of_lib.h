@@ -91,8 +91,7 @@ typedef int (*cc_of_recv_pkt)(cc_ofchannel_key_t chann_id,
  *     
  */
 int 
-cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type, 
-               cc_ofver_e max_ofver_supported);
+cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type);
 
 int
 cc_of_lib_free(void);

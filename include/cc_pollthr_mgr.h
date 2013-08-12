@@ -32,7 +32,7 @@
 
  * Add pipe
  add_fd_msg.fd_type = PIPE;
- add_fd_msg.fd_action = ADD;
+ add_fd_msg.fd_action = ADD_FD;
  add_fd_msg.poll_events = POLLIN;
  add_fd_msg.pollin_func = NULL;
  add_fd_msg.pollout_func = NULL;
@@ -46,7 +46,7 @@
  
  * Delete pipe
  add_fd_msg.fd_type = PIPE;
- add_fd_msg.fd_action = DELETE;
+ add_fd_msg.fd_action = DELETE_FD;
  add_fd_msg.fd = new_pipe_wr_fd1;
  add_fd_msg.pollin_func = NULL;
  add_fd_msg.pollout_func = NULL;
@@ -56,7 +56,7 @@
  * Delete primary pipe to self destruct
  
  add_fd_msg.fd_type = PIPE;
- add_fd_msg.fd_action = DELETE;
+ add_fd_msg.fd_action = DELETE_FD;
  add_fd_msg.fd = PRI_PIPE_WR_FD;
  add_fd_msg.pollin_func = NULL;
  add_fd_msg.pollout_func = NULL;
@@ -105,8 +105,8 @@ typedef enum adpoll_fd_type_ {
 } adpoll_fd_type_e;
 
 typedef enum adpoll_fd_action_ {
-    ADD,
-    DELETE
+    ADD_FD,
+    DELETE_FD
 } adpoll_fd_action_e;
 
 /* Callback function for FD poll-in and poll-out */

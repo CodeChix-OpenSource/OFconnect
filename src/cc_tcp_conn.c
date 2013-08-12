@@ -1,9 +1,10 @@
 #include "cc_of_global.h"
+#include "cc_net_conn.h"
 
 // Number of backlog connection requests
 #define LISTENQ 1024
 
-net_svcs_t tcp_sockfns = {
+extern net_svcs_t tcp_sockfns = {
     tcp_open_clientfd,
     tcp_open_listenfd,
     tcp_accept,
@@ -12,9 +13,7 @@ net_svcs_t tcp_sockfns = {
     tcp_write,
 };
 
-extern tcp_sockfns;
-
-in tcp_open_clientfd(char *ipaddr, int port)
+int tcp_open_clientfd(char *ipaddr, int port)
 {
     int clientfd;
     struct sockaddr_in serveraddr;

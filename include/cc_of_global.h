@@ -18,6 +18,10 @@
 #include "cc_log.h"
 #include "cc_pollthr_mgr.h"
 #include "cc_of_lib.h"
+#include "cc_tcp_conn.h"
+#include "cc_udp_conn.h"
+#include "cc_of_util.h"
+
 
 #define SIZE_RW_THREAD_BUCKET        20
 #define MAX_PER_THREAD_RWSOCKETS     200

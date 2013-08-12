@@ -109,7 +109,8 @@ cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type,
 }
 
 
-int cc_of_dev_register(cc_ofdev_key_t dev_key, uint16_t layer4_port, cc_ofver_e max_ofver, cc_onf_recv_pkt recv_func) {
+int cc_of_dev_register(cc_ofdev_key_t dev_key, uint16_t layer4_port,
+                       cc_ofver_e max_ofver, cc_of_recv_pkt recv_func) {
     cc_of_ret status = CC_OF_OK;
     cc_ofdev_info_t *cc_ofdev;
     char switch_ip[INET_ADDRSTRLEN];

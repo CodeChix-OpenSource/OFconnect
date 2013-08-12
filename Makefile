@@ -17,11 +17,9 @@ DOCDIR  := $(ROOTDIR)/doc
 
 SRCS     := $(wildcard $(SRCDIR)/*.c)
 OBJS     := $(SRCS:%.c=%.o)
-INCLUDES := -I
 
 .PHONY: all
 all: $(TARGET_LIB)
-
 #------------------------------
 #$(OBJS):$(SRCS)
 #	$(CC) $(CFLAGS) $< $@
@@ -43,8 +41,8 @@ all: $(TARGET_LIB)
 #	$(CC) $(INCLUDES) $(CFLAGS) -o $(OBJS) -c $(SRCS)
 
 $(SRCS .c.o):
-	$(CC) $(INCLUDES) $(CFLAGS) -c $< -o $@
-	
+	$(CC) $(CFLAGS) -c $< -o $@
+
 $(TARGET_LIB):$(OBJS)
 	$(CC) $(LIBS) $(LDFLAGS) $(OBJS) -o $(TARGET_LIB) 
 
@@ -52,4 +50,5 @@ $(TARGET_LIB):$(OBJS)
 #	$(CC) $(CFLAGS) -o $@ -c $<
 
 .PHONY: clean
-clean: $(RM) $(TARGET_LIB) $(OBJS) $(SRCS:.c=.d) # $(OBJDIR)
+clean: 
+	$(RM) $(TARGET_LIB) $(OBJS)

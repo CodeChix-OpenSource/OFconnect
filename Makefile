@@ -6,7 +6,13 @@ RM     := rm -f
 
 TARGET_LIB = libccof.so
 
-MAKE    := make
+#set environment variable $MAKE to the correct
+# binary. Useful when there are multiple versions
+# installed. 
+# Mandatory requirement: 3.82 version of make
+ifndef MAKE
+	MAKE := make
+endif
 ROOTDIR := $(CURDIR)
 SRCDIR  := $(ROOTDIR)/src
 INCLDIR := $(ROOTDIR)/include
@@ -33,18 +39,20 @@ $(OBJDIR):
 $(OBJS) : $(SRCS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-
 .PHONY: dryrun
 dryrun:
+	@echo "$(MAKE)"
 	@echo "$(CC) $(CFLAGS)"
 	@echo "$(OBJS)"
+	@echo "$(SRCS)"
 
 
 .PHONY: tlib
 tlib: $(TARGET_LIB)
 
 $(TARGET_LIB):$(OBJS)
-	$(CC) $(LIBS) $(LDFLAGS) $(OBJS) -o $(TARGET_LIB) 
+	@echo "	$(CC) $(LIBS) $(LDFLAGS) $(OBJS) -o $(TARGET_LIB)"
+	$(CC) $(LIBS) $(LDFLAGS) $(OBJS) -o $(TARGET_LIB)
 
 .PHONY: all
 all:

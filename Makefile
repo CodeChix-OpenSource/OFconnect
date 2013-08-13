@@ -36,7 +36,7 @@ $(OBJS): | $(OBJDIR)
 $(OBJDIR): 
 	mkdir $(OBJDIR)
 
-$(OBJS) : $(SRCS)
+$(OBJDIR)/%.o : $(SRCDIR)/%.c 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 .PHONY: dryrun
@@ -47,17 +47,12 @@ dryrun:
 	@echo "$(SRCS)"
 
 
-.PHONY: tlib
-tlib: $(TARGET_LIB)
+.PHONY: all
+all: $(TARGET_LIB)
 
 $(TARGET_LIB):$(OBJS)
 	@echo "	$(CC) $(LIBS) $(LDFLAGS) $(OBJS) -o $(TARGET_LIB)"
 	$(CC) $(LIBS) $(LDFLAGS) $(OBJS) -o $(TARGET_LIB)
-
-.PHONY: all
-all:
-	$(MAKE) objects
-	$(MAKE) tlib
 
 
 .PHONY: clean

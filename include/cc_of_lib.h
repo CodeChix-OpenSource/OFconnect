@@ -31,6 +31,8 @@ static const char * cc_of_errtable[] = {
     "misc error",
 };
 
+inline char *cc_of_strerror(int errnum);
+
 typedef enum cc_ofver_ {
     CC_OFVER_1_0   = 0,
     CC_OFVER_1_3,
@@ -38,17 +40,6 @@ typedef enum cc_ofver_ {
 } cc_ofver_e;
 
 #define CC_OF_ERRTABLE_SIZE (sizeof(cc_of_errtable) / sizeof(cc_of_errtable[0]))
-
-inline char *cc_of_strerror(int errnum)
-{
-    if(errnum > 0) {
-	return "Invalid errnum";
-    } else if (errnum <= -(int)CC_OF_ERRTABLE_SIZE){
-	return "Unknown error";
-    } else {
-	return cc_of_errtable[-errnum];
-    }
-}
 
 
 typedef int cc_of_ret;

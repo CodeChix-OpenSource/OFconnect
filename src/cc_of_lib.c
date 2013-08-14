@@ -69,11 +69,28 @@ gboolean cc_ofrw_htbl_equal_func(gconstpointer a, gconstpointer b)
     }
 }
 /* Call destroy lib for error cases */
+int
+cc_of_lib_abort()
+{
+    CC_LOG_ERROR("%s NOT IMPLEMENTED", __FUNCTION__);
+}
+
+inline char *cc_of_strerror(int errnum)
+{
+    if(errnum > 0) {
+	return "Invalid errnum";
+    } else if (errnum <= -(int)CC_OF_ERRTABLE_SIZE){
+	return "Unknown error";
+    } else {
+	return cc_of_errtable[-errnum];
+    }
+}
 
 int
 cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type)
 {
     cc_of_ret status = CC_OF_OK;
+    adpoll_thread_mgr_t *tmgr = NULL;
 
     // Initialize cc_of_global
     cc_of_global.ofdrv_type = drv_type;
@@ -128,7 +145,8 @@ cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type)
     }
     cc_of_global.ofrw_pollthr_list = NULL;
 
-    if ((status = cc_create_rw_pollthr(MAX_PER_THREAD_RWSOCKETS,
+    if ((status = cc_create_rw_pollthr(tmgr,
+                                       MAX_PER_THREAD_RWSOCKETS,
                                        MAX_PIPE_PER_THR_MGR)) < 0) {
 	cc_of_lib_abort();
 	CC_LOG_FATAL("%s(%d): %s", __FUNCTION__, __LINE__,

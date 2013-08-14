@@ -97,7 +97,7 @@
 #define IS_FD_WR(fd) (fd % 2)
 
 /* Thread-priate data for Polling Thread */
-static GPrivate tname_key;
+GPrivate tname_key;
 
 typedef enum adpoll_fd_type_ {
     PIPE,

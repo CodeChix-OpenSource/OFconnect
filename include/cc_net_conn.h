@@ -94,12 +94,12 @@ typedef struct net_svcs_ {
     int (*open_clientfd)(char *ipaddr, int port);
     int (*open_serverfd)(char *ipaddr, int port);
     int (*accept_conn)(int listenfd, struct sockaddr  *clientaddr, 
-	               int *addrlen);
+	               uint32_t *addrlen);
     int (*close_conn)(int *sockfd);
-    int (*read_data)(int sockfd, void *buf, size_t len, int flags,
-	             struct sockaddr *src_addr, socklen_t *addrlen);
-    int (*write_data)(int sockfd, const void *buf, size_t len, int flags,
-	              const struct sockaddr *dest_addr, socklen_t addrlen);
+    ssize_t (*read_data)(int sockfd, void *buf, size_t len, int flags,
+                         struct sockaddr *src_addr, socklen_t *addrlen);
+    ssize_t (*write_data)(int sockfd, const void *buf, size_t len, int flags,
+                          const struct sockaddr *dest_addr, socklen_t addrlen);
 } net_svcs_t;
    
 #endif //CC_NET_CONN_H

@@ -4,7 +4,11 @@
 #ifndef CC_OF_UTIL_H
 #define CC_OF_UTIL_H
 
-#include "cc_pollthr_mgr.h"
+#include "cc_of_global.h"
+
+#ifndef UNUSED
+#define UNUSED __attribute__ ((__unused__))
+#endif
 
 /* HTBL utilities */
 typedef enum htbl_update_ops_ {
@@ -48,7 +52,8 @@ del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock);
 
 /* POLLTHR utilities */
 cc_of_ret
-cc_create_rw_pollthr(uint32_t max_sockets,
+cc_create_rw_pollthr(adpoll_thread_mgr_t *tmgr,
+                     uint32_t max_sockets,
                      uint32_t max_pipes);
 
 

@@ -17,10 +17,17 @@
 #include "cc_net_conn.h"
 #include "cc_log.h"
 #include "cc_pollthr_mgr.h"
+#include "cc_of_lib.h"
+#include "cc_tcp_conn.h"
+#include "cc_udp_conn.h"
+#include "cc_of_util.h"
+
 
 #define SIZE_RW_THREAD_BUCKET        20
 #define MAX_PER_THREAD_RWSOCKETS     200
 
+#if 0
+/* MOVING THIS TO NET_CONN.H */
 typedef enum of_dev_type_ {
     SWITCH = 0,
     CONTROLLER,
@@ -32,7 +39,7 @@ typedef enum cc_ofrw_state_ {
     CC_OF_RW_UP
 } cc_ofrw_state_e;
 
-typdef struct cc_ofrw_key_ {
+typedef struct cc_ofrw_key_ {
     int       rw_sockfd;    
 } cc_ofrw_key_t;
 
@@ -43,7 +50,7 @@ typedef struct cc_ofstats_ {
 } cc_ofstats_t;
 
 /* node in ofrw_htbl */
-typdef struct cc_ofrw_info_ {
+typedef struct cc_ofrw_info_ {
     cc_ofrw_state_e      state;
     adpoll_thread_mgr_t  *thr_mgr_p;
 } cc_ofrw_info_t;
@@ -54,12 +61,6 @@ typedef struct cc_ofdev_key_ {
     L4_type_e      layer4_proto;    
 } cc_ofdev_key_t;
 
-typedef enum cc_ofver_ {
-    CC_OFVER_1_0   = 0,
-    CC_OFVER_1_3,
-    CC_OFVER_1_3_1
-} cc_ofver_e;
-
 /* node in ofdev_htbl */
 typedef struct cc_ofdev_info_ {
     uint16_t       controller_L4_port;
@@ -69,7 +70,7 @@ typedef struct cc_ofdev_info_ {
     GList          *ofrw_socket_list; //list of rw sockets
     GMutex	    ofrw_socket_list_lock;
 
-    cc_onf_recv_pkt recv_func;
+    cc_of_recv_pkt recv_func;
 
     int            main_sockfd;
 } cc_ofdev_info_t;
@@ -86,6 +87,8 @@ typedef struct cc_ofchann_info_ {
     int                   count_retries; /* CLIENT: reconnection attempts */
     cc_ofstats_t          stats;    
 } cc_ofchannel_info_t;
+
+#endif
 
 typedef struct cc_of_global_ {
     /* driver type could be client or server */

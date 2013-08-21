@@ -24,7 +24,10 @@
 
 
 #define SIZE_RW_THREAD_BUCKET        20
+/* Unused ?? */
 #define MAX_PER_THREAD_RWSOCKETS     200
+#define MAX_PIPE_PER_THR_MGR 1 
+/* Make this 2 now since we have a pipe to buffer msgs ?? */
 
 #if 0
 /* MOVING THIS TO NET_CONN.H */
@@ -58,6 +61,7 @@ typedef struct cc_ofrw_info_ {
 typedef struct cc_ofdev_key_ {
     ipaddr_v4v6_t  controller_ip_addr;
     ipaddr_v4v6_t  switch_ip_addr;
+    uint16_t       port;
     L4_type_e      layer4_proto;    
 } cc_ofdev_key_t;
 

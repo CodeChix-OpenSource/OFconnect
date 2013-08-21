@@ -33,7 +33,7 @@ cc_of_ret
 del_ofrw_rwsocket(int del_fd);
 
 cc_of_ret
-add_upd_ofrw_rwsocket(int add_fd);
+add_upd_ofrw_ofdev_rwsocket(int add_fd);
 
 cc_of_ret
 add_upd_ofchann_rwsocket(cc_ofchannel_key_t key,
@@ -48,12 +48,15 @@ add_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock);
 cc_of_ret
 del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock);
 
-
+cc_of_ret
+atomic_add_upd_ofrw_ofdev_rwsocket(int sockfd, 
+				   adpoll_thread_mgr_t  *thr_mgr,
+				   cc_ofdev_key_t key);
 
 /* POLLTHR utilities */
 cc_of_ret
-cc_create_rw_pollthr(adpoll_thread_mgr_t *tmgr,
-                     uint32_t max_sockets,
+cc_create_rw_pollthr(adpoll_thread_mgr_t **tmgr,
+                     int32_t max_sockets,
                      uint32_t max_pipes);
 
 
@@ -62,17 +65,17 @@ cc_get_count_rw_pollthr(void);
 
 
 cc_of_ret
-cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t *tmgr,
+cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t **tmgr,
                             uint32_t max_sockets,
                             uint32_t max_pipes);
 
 
 cc_of_ret
-cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, int fd);
+cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, adpoll_thr_msg_t *msg);
 
 
 cc_of_ret
-cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t add_fd_msg);
+cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *msg, cc_ofdev_key_t key);
 
 
 #endif //CC_OF_UTIL_H

@@ -69,7 +69,7 @@ del_ofrw_rwsocket(int del_fd)
 }
 
 cc_of_ret
-add_upd_ofrw_rwsocket(int add_fd)
+add_upd_ofrw_rwsocket(int add_fd, adpoll_thread_mgr_t  *thr_mgr_p)
 {
     cc_ofrw_key_t *ofrw_key;
     cc_ofrw_info_t *ofrw_info;
@@ -81,7 +81,7 @@ add_upd_ofrw_rwsocket(int add_fd)
 
     ofrw_key->rw_sockfd = add_fd;
     ofrw_info->state = CC_OF_RW_DOWN;
-    ofrw_info->thr_mgr_p = NULL;
+    ofrw_info->thr_mgr_p = thr_mgr_p;
 
     rc = update_global_htbl(OFRW, ADD,
                             ofrw_key, ofrw_info,
@@ -144,8 +144,7 @@ del_ofchann_rwsocket(int rwsock)
     return CC_OF_OK;
 }
 
-cc_of_ret
-add_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
+cc_of_ret add_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
 {
     cc_ofdev_info_t *ofdev = NULL;
     int *list_elem;
@@ -189,7 +188,7 @@ del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
                      "in ofrw_socket_list",
                      __FUNCTION__, __LINE__, rwsock);
         g_mutex_unlock(&ofdev->ofrw_socket_list_lock);
-        return(CC_OF_EGEN);
+        return CC_OF_EMISC;
     }
 
     tmp_rwsock = (int *)tmp_list->data;
@@ -200,6 +199,28 @@ del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
     
     return(update_global_htbl(OFDEV, ADD, &key, &ofdev, &new_entry));
 }
+
+cc_of_ret
+atomic_add_upd_ofrw_ofdev_rwsocket(int sockfd, adpoll_thread_mgr_t  *thr_mgr, 
+                                   cc_ofdev_key_t key)
+{
+    cc_of_ret status = CC_OF_OK;
+
+    if((status = add_upd_ofrw_rwsocket(sockfd, thr_mgr)) < 0) {
+        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
+        return status;
+    } else {
+	    if ((status = add_ofdev_rwsocket(key, sockfd)) < 0) {
+	        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
+	        del_ofrw_rwsocket(sockfd);
+	        return status;
+	    } else {
+	        CC_LOG_DEBUG("%s(%d): Atomically added sockfd to ofrw & ofdev htbls", __FUNCTION__, __LINE__);
+	        return status;
+	    }
+    }    
+}
+
 
 
 /*-----------------------------------------------------------------------*/
@@ -214,21 +235,21 @@ cc_get_count_rw_pollthr(void)
 }
 
 cc_of_ret
-cc_create_rw_pollthr(adpoll_thread_mgr_t *tmgr,
-                     uint32_t max_sockets,
+cc_create_rw_pollthr(adpoll_thread_mgr_t **tmgr,
+                     int32_t max_sockets,
                      uint32_t max_pipes)
 {
-
+    adpoll_thread_mgr_t *tmgr_new = NULL;
     char tname[MAX_NAME_LEN];
 
     g_sprintf(tname,"rwthr_%3d", cc_get_count_rw_pollthr() + 1);
     
-    tmgr = adp_thr_mgr_new(tname, max_sockets, max_pipes);
+    tmgr_new = adp_thr_mgr_new(tname, max_sockets, max_pipes);
 
     if (tmgr == NULL) {
         CC_LOG_ERROR("%s(%d): failed to create new poll thread for rw",
                      __FUNCTION__, __LINE__);
-        return(CC_OF_EGEN);
+        return CC_OF_EMISC;
     }
 
     /* update the global GList */
@@ -239,13 +260,15 @@ cc_create_rw_pollthr(adpoll_thread_mgr_t *tmgr,
                  __FUNCTION__, __LINE__, tname,
                  cc_get_count_rw_pollthr());
 
+    if (tmgr != NULL)
+        *tmgr = tmgr_new;
     return(CC_OF_OK);
 }
 
 
 cc_of_ret
-cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t *tmgr,
-                             uint32_t max_sockets, /* used for create */
+cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t **tmgr,
+			                 uint32_t max_sockets, /* used for create */
                              uint32_t max_pipes) /* used for create */
 {
     GList *elem, *next_elem;
@@ -272,7 +295,7 @@ cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t *tmgr,
         elem = next_elem;
     }
     
-    tmgr = (adpoll_thread_mgr_t *)(elem);
+    *tmgr = (adpoll_thread_mgr_t *)(elem);
     
     return(CC_OF_OK);
 }
@@ -294,22 +317,27 @@ cc_pollthr_list_compare_func(adpoll_thread_mgr_t *tmgr1,
     return 0;
 }
 
-
+// changed argument fd to thr_msg
+// commented for compiling
 cc_of_ret
-cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, int fd)
+cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, adpoll_thr_msg_t *thr_msg)
 {
-    adpoll_thr_msg_t del_fd_msg;
-    GList *tmp_list = NULL;
+    tmgr = NULL;
+    thr_msg = NULL;
+    
+    CC_LOG_ERROR("%s NOT IMPLEMENTED, %p, %p", __FUNCTION__, tmgr, thr_msg);
+   
+
+    /* TODO: Finish this impl */
+    /*GList *tmp_list = NULL;
     adpoll_thread_mgr_t *tmp_tmgr = NULL;
     
-    del_fd_msg.fd_type = SOCKET;
-    del_fd_msg.fd_action = DELETE_FD;
-    del_fd_msg.fd = fd;
+    thr_msg.fd_action = DELETE_FD;
     
-    adp_thr_mgr_add_del_fd(tmgr, &del_fd_msg);
+    adp_thr_mgr_add_del_fd(tmgr, &thr_msg);
 
     if (cc_get_count_rw_pollthr() == 1) {
-        /* no sorting required with only 1 thread */
+        // no sorting required with only 1 thread 
         CC_LOG_DEBUG("%s(%d): only one poll thread. skip sorting",
                      __FUNCTION__, __LINE__);
         return(CC_OF_OK);
@@ -332,21 +360,41 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, int fd)
         tmgr,
         (GCompareFunc)cc_pollthr_list_compare_func);
 
-    /* TODO: clean out this fd from global structures */
+    // TODO: clean out this fd from global structures 
 //    ofrw_socket_list in device
 //    cc_of_global.ofrw_htbl - cc_ofrw_info_t
     //delete from ofchannel_htbl - cc_ofchannel_info_t
-
+*/
     return (CC_OF_OK);
 
 }
 
 cc_of_ret
-cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t add_fd_msg UNUSED)
+cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key)
 {
-    /* marked UNUSED for compilation purposes */
+    cc_of_ret status = CC_OF_OK;
+    adpoll_thread_mgr_t *tmgr = NULL;
+
     /* find or create a poll thread */
-    /* add the fd to it */
-    /* add to global structures */
-    return CC_OF_OK;
+    status = cc_find_or_create_rw_pollthr(&tmgr, MAX_PER_THREAD_RWSOCKETS, MAX_PIPE_PER_THR_MGR);
+    if(status < 0) {
+        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
+        return status;
+    } else {
+	    /* add the fd to the thr */
+	    // retval??
+	    adp_thr_mgr_add_del_fd(tmgr, thr_msg);
+	
+	    /* add fd to global structures */
+	    status = atomic_add_upd_ofrw_ofdev_rwsocket(thr_msg->fd, tmgr, key);
+	    if (status < 0) {
+	        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
+	        /* Del fd from thr_mgr if update of global structures fails */
+            cc_del_sockfd_rw_pollthr(tmgr, thr_msg);
+            // adp_thr_mgr_add_del_fd  ??? 
+	        return status;
+	    }
+    }
+
+    return status;
 }

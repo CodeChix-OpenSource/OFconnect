@@ -95,6 +95,7 @@ void adp_thr_mgr_free(adpoll_thread_mgr_t *this)
  * return value: ADD - the newly created wr pipe is returned
  *             : DELETE - returns -1.
  * TBD: add functionality for SOCKET processing
+ * Do we need to synchrnize this fn ??
  */
 int
 adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
@@ -134,7 +135,7 @@ adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
         } else if (msg->fd_action == DELETE_FD) {
             /* find this fd in pipes_arr */
             int del_rd_fd_index;
-            gboolean found = FALSE;
+            
             CC_LOG_DEBUG("%s(%d):pipe %d DELETE", __FUNCTION__, __LINE__,
                          msg->fd);
             if ((msg->fd == this->pipes_arr[PRI_PIPE_RD_FD]) ||
@@ -179,7 +180,6 @@ adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
                     } else {
                         del_rd_fd_index -= RD_OFFSET;
                     }
-                    found = TRUE;
 
                     CC_LOG_DEBUG("%s(%d): found the fd %d in pipes_arr",
                                  __FUNCTION__, __LINE__, this->pipes_arr[i]);
@@ -238,11 +238,12 @@ static void
 poll_fd_process(adpoll_fd_info_t *data_p,
                 char *tname)
 {
+    /* Commented unused variables for compilation
     pollthr_private_t *thr_pvt_p = NULL;
     GList *fd_list;
     
     thr_pvt_p = g_private_get(&tname_key);
-    fd_list = thr_pvt_p->fd_list;
+    fd_list = thr_pvt_p->fd_list; */
 
     if ((data_p->pollfd_entry_p) &&
         ((data_p->pollfd_entry_p->revents & POLLIN) &

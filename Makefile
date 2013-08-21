@@ -1,7 +1,7 @@
 CC     := gcc
 
 LDFLAGS:= -shared
-LIBS   := -lglib-2.0
+LIBS   := $(shell pkg-config --cflags glib-2.0)
 RM     := rm -f
 
 TARGET_LIB = libccof.so
@@ -24,8 +24,13 @@ INCLUDES := -I$(ROOTDIR)/include
 SRCS     := $(wildcard $(SRCDIR)/*.c)
 OBJS     := $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCS))
 
-CFLAGS := -I/usr/include/glib-2.0 -I/usr/lib/glib-2.0/include \
-	  $(INCLUDES) -Wall -Wextra -g # -fpic vs -fPIC ??
+
+# Mandatory requirement: GLib-2.0, pkg-config 0.26
+# Need to add a check for this later. Best place to do 
+# this check will be a configure.ac once we have 
+# autoconf setup.
+CFLAGS := $(shell pkg-config --cflags glib-2.0) \
+	$(INCLUDES) -Wall -Wextra -g -fPIC
 
 
 .PHONY: objects

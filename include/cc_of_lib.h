@@ -7,20 +7,22 @@
 #include "cc_net_conn.h"
 
 //error codes
-#define CC_OF_OK      0
-#define CC_OF_EEXIST  -1 /* already exists */
-#define CC_OF_EINVAL  -2 /* invalid attribute */
-#define CC_OF_EAGAIN  -3 /* retry */
-#define CC_OF_ENOMEM  -4 /* malloc or other mem max */
-#define CC_OF_MDEV    -5 /* max out on dev */
-#define CC_OF_EHTBL   -6 /* hash table failures */
-#define CC_OF_MCHANN  -7 /* max out on channels */
-#define CC_OF_ECHANN  -8 /* unable to establish socket */
-#define CC_OF_EGEN    -9 /* misc error */
+#define CC_OF_OK        0
+#define CC_OF_ESYS     -1  /* syscall, library call error */
+#define CC_OF_EINVAL   -2  /* invalid attribute */
+#define CC_OF_EAGAIN   -3  /* retry */
+#define CC_OF_ENOMEM   -4  /* malloc or other mem max */
+#define CC_OF_MDEV     -5  /* max out on dev */
+#define CC_OF_EHTBL    -6  /* hash table failures */
+#define CC_OF_MCHANN   -7  /* max out on channels */
+#define CC_OF_ECHANN   -8  /* unable to establish socket */
+#define CC_OF_EEXIST   -9  /* already exists */
+#define CC_OF_EMISC    -10 /* misc error */
+
 
 static const char * cc_of_errtable[] = {
     "okay",
-    "already exists",
+    "syscall/library call failed",
     "invalid attribute",
     "retry",
     "out of memory",
@@ -28,10 +30,11 @@ static const char * cc_of_errtable[] = {
     "hash table failures",
     "max out on channels",
     "unable to establish sockets",
+    "already exists",
     "misc error",
 };
 
-inline char *cc_of_strerror(int errnum);
+inline const char *cc_of_strerror(int errnum);
 
 typedef enum cc_ofver_ {
     CC_OFVER_1_0   = 0,
@@ -93,7 +96,6 @@ cc_of_lib_abort(void);
 
 int
 cc_of_dev_register(cc_ofdev_key_t dev_key,
-                   uint16_t layer4_port,
                    cc_ofver_e max_ofver,
                    cc_of_recv_pkt recv_func /*func ptr*/);
 /* possible additional fields for TLS certificate */
@@ -115,6 +117,7 @@ cc_of_dev_free(cc_ofdev_key_t dev_key);
 int 
 cc_of_create_channel(cc_ofdev_key_t dev_key,
                      cc_ofchannel_key_t chann_id); /*noop for controller */
+// Port val as argument ??
 
 /**
  * cc_of_destroy_channel

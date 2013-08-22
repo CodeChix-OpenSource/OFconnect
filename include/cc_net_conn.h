@@ -57,22 +57,23 @@ typedef struct cc_ofrw_info_ {
     adpoll_thread_mgr_t  *thr_mgr_p;
 } cc_ofrw_info_t;
 
+
 typedef struct cc_ofdev_key_ {
     ipaddr_v4v6_t  controller_ip_addr;
-    ipaddr_v4v6_t  switch_ip_addr;
-    L4_type_e      layer4_proto;    
+    ipaddr_v4v6_t  switch_ip_addr; 
+    uint16_t       controller_L4_port;
+    uint16_t       switch_L4_port;
+    L4_type_e      layer4_proto;
 } cc_ofdev_key_t;
 
 /* node in ofdev_htbl */
 typedef struct cc_ofdev_info_ {
-    uint16_t       controller_L4_port;
-
     uint32_t       of_max_ver;  /* cc_ofver_e */
     
     GList          *ofrw_socket_list; //list of rw sockets
-    GMutex	    ofrw_socket_list_lock;
+    GMutex	       ofrw_socket_list_lock;
 
-    gpointer        recv_func; /* cc_of_recv_pkt function ptr */
+    gpointer       recv_func; /* cc_of_recv_pkt function ptr */
 
     int            main_sockfd;
 } cc_ofdev_info_t;
@@ -91,11 +92,10 @@ typedef struct cc_ofchann_info_ {
 } cc_ofchannel_info_t;
 
 typedef struct net_svcs_ {
-    int (*open_clientfd)(char *ipaddr, int port);
-    int (*open_serverfd)(char *ipaddr, int port);
-    int (*accept_conn)(int listenfd, struct sockaddr  *clientaddr, 
-	               uint32_t *addrlen);
-    int (*close_conn)(int *sockfd);
+    int (*open_clientfd)(cc_ofdev_key_t key);
+    int (*open_serverfd)(cc_ofdev_key_t key);
+    int (*accept_conn)(int listenfd);
+    int (*close_conn)(int sockfd);
     ssize_t (*read_data)(int sockfd, void *buf, size_t len, int flags,
                          struct sockaddr *src_addr, socklen_t *addrlen);
     ssize_t (*write_data)(int sockfd, const void *buf, size_t len, int flags,

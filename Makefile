@@ -1,7 +1,7 @@
 CC     := gcc
 
 LDFLAGS:= -shared
-LIBS   := $(shell pkg-config --cflags glib-2.0)
+LIBS   := $(shell pkg-config --libs glib-2.0)
 RM     := rm -f
 
 TARGET_LIB = libccof.so
@@ -31,7 +31,6 @@ OBJS     := $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCS))
 # autoconf setup.
 CFLAGS := $(shell pkg-config --cflags glib-2.0) \
 	$(INCLUDES) -Wall -Wextra -g -fPIC
-
 
 .PHONY: objects
 objects: $(OBJS)

@@ -1,26 +1,31 @@
 CC     := gcc
 
-LDFLAGS:= -shared
-LIBS   := $(shell pkg-config --cflags glib-2.0)
+LDFLAGS := -shared
+LIBS   := $(shell pkg-config --libs glib-2.0)
 RM     := rm -f
-
-TARGET_LIB = libccof.so
+MAJOR_VERSION := 0
+MINOR_VERSION := 0
+NAME     := ccof
+LIBNAME  := lib$(NAME).so
+SONAME   := $(LIBNAME).$(MAJOR_VERSION)
+REALNAME := $(SONAME).$(MINOR_VERSION)
+COMLIB   := /usr/local/lib
+COMINCL  := /usr/local/include
 
 #set environment variable $MAKE to the correct
 # binary. Useful when there are multiple versions
 # installed. 
-# Mandatory requirement: 3.82 version of make
 ifndef MAKE
 	MAKE := make
 endif
-ROOTDIR := $(CURDIR)
-SRCDIR  := $(ROOTDIR)/src
-INCLDIR := $(ROOTDIR)/include
-TESTDIR := $(ROOTDIR)/tests
-OBJDIR  := $(ROOTDIR)/obj
-DOCDIR  := $(ROOTDIR)/doc
+CCDIR   := $(CURDIR)
+SRCDIR  := $(CCDIR)/src
+INCLDIR := $(CCDIR)/include
+TESTDIR := $(CCDIR)/tests
+OBJDIR  := $(CCDIR)/obj
+DOCDIR  := $(CCDIR)/doc
 
-INCLUDES := -I$(ROOTDIR)/include
+INCLUDES := -I$(CCDIR)/include
 SRCS     := $(wildcard $(SRCDIR)/*.c)
 OBJS     := $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCS))
 
@@ -30,8 +35,9 @@ OBJS     := $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCS))
 # this check will be a configure.ac once we have 
 # autoconf setup.
 CFLAGS := $(shell pkg-config --cflags glib-2.0) \
-	$(INCLUDES) -Wall -Wextra -g -fPIC
-
+	$(INCLUDES) -Wall -Wextra -g -fPIC \
+	-Wl,-export-dynamic
+LDFLAGS:= -shared -Wl,-soname,$(SONAME)
 
 .PHONY: objects
 objects: $(OBJS)
@@ -53,14 +59,27 @@ dryrun:
 
 
 .PHONY: all
-all: $(TARGET_LIB)
+all: $(REALNAME)
 
-$(TARGET_LIB):$(OBJS)
-	@echo "	$(CC) $(LIBS) $(LDFLAGS) $(OBJS) -o $(TARGET_LIB)"
-	$(CC) $(LIBS) $(LDFLAGS) $(OBJS) -o $(TARGET_LIB)
+$(REALNAME):$(OBJS)
+	@echo "$(CC) $(LIBS) $(LDFLAGS) $(OBJS) -o $(REALNAME) -lc"
+	$(CC) $(LIBS) $(LDFLAGS) $(OBJS) -o $(REALNAME) -lc
 
 
 .PHONY: clean
 clean: 
-	$(RM) $(TARGET_LIB) $(OBJS)
+	$(RM) $(REALNAME) $(OBJS)
 	$(RM) -r $(OBJDIR)
+
+.PHONY: install
+#install needs sudo permissions
+#cp libccof.so.0.0 /usr/local/lib/
+#ldconfig -n -v /usr/local/lib/
+#ln -sf /usr/local/lib/libccof.so.0 /usr/local/lib/libccof.so
+#cp include/cc_of_lib.h /usr/local/include/
+install:
+	cp $(REALNAME) $(COMLIB)/
+	ldconfig -n -v $(COMLIB)
+	ln -sf $(COMLIB)/$(SONAME) $(COMLIB)/$(LIBNAME)
+	cp $(INCLDIR)/cc_of_lib.h $(COMINCL)/
+

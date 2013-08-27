@@ -6,6 +6,9 @@
 
 #include "cc_pollthr_mgr.h"
 
+#define MAXBUF 65535
+/* Is this optimal? */
+
 typedef uint32_t ipaddr_v4_t;
 typedef ipaddr_v4_t ipaddr_v4v6_t;
 
@@ -55,15 +58,29 @@ typedef struct cc_ofstats_ {
 typedef struct cc_ofrw_info_ {
     cc_ofrw_state_e      state;
     adpoll_thread_mgr_t  *thr_mgr_p;
+    L4_type_e            layer4_proto;
 } cc_ofrw_info_t;
 
+/* mapping of channel key (dp-id/aux-id) to rw_sockfd) */
+typedef struct cc_ofchannel_key_ {
+    uint64_t  dp_id;
+    uint8_t   aux_id;
+} cc_ofchannel_key_t;
+
+typedef struct cc_ofchann_info_ {
+    int                   rw_sockfd;
+    int                   count_retries; /* CLIENT: reconnection attempts */
+    cc_ofstats_t          stats;    
+} cc_ofchannel_info_t;
+
+typedef int (*cc_of_recv_pkt)(cc_ofchannel_key_t chann_id,
+                              void *of_msg,
+                              size_t of_msg_len);
 
 typedef struct cc_ofdev_key_ {
     ipaddr_v4v6_t  controller_ip_addr;
     ipaddr_v4v6_t  switch_ip_addr; 
     uint16_t       controller_L4_port;
-    uint16_t       switch_L4_port;
-    L4_type_e      layer4_proto;
 } cc_ofdev_key_t;
 
 /* node in ofdev_htbl */
@@ -73,28 +90,17 @@ typedef struct cc_ofdev_info_ {
     GList          *ofrw_socket_list; //list of rw sockets
     GMutex	       ofrw_socket_list_lock;
 
-    gpointer       recv_func; /* cc_of_recv_pkt function ptr */
+    cc_of_recv_pkt recv_func; /* cc_of_recv_pkt function ptr */
 
-    int            main_sockfd;
+    int            main_sockfd_tcp;
+    int            main_sockfd_udp;
 } cc_ofdev_info_t;
 
-
-/* mapping of channel key (dp-id/aux-id) to rw_sockfd) */
-typedef struct cc_ofchannel_key_ {
-    uint64_t  dp_id;
-    uint8_t   aux_id;
-}cc_ofchannel_key_t;
-
-typedef struct cc_ofchann_info_ {
-    int                   rw_sockfd;
-    int                   count_retries; /* CLIENT: reconnection attempts */
-    cc_ofstats_t          stats;    
-} cc_ofchannel_info_t;
 
 typedef struct net_svcs_ {
     int (*open_clientfd)(cc_ofdev_key_t key);
     int (*open_serverfd)(cc_ofdev_key_t key);
-    int (*accept_conn)(int listenfd);
+    int (*accept_conn)(int listenfd, cc_ofdev_key_t key);
     int (*close_conn)(int sockfd);
     ssize_t (*read_data)(int sockfd, void *buf, size_t len, int flags,
                          struct sockaddr *src_addr, socklen_t *addrlen);

@@ -1,4 +1,5 @@
 #include "cc_of_global.h"
+#include "cc_of_priv.h"
 
 
 cc_of_global_t cc_of_global;
@@ -101,6 +102,13 @@ cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type)
     cc_of_ret status = CC_OF_OK;
 
     // Initialize cc_of_global
+    cc_of_global.ofdebug_enable = FALSE;
+    cc_of_global.oflog_enable = FALSE;
+    cc_of_global.oflog_fd = NULL;
+    cc_of_global.oflog_file = malloc(sizeof(char) *
+                                     LOG_FILE_NAME_SIZE);
+    g_mutex_init(&cc_of_global.oflog_lock);
+    
     cc_of_global.ofdrv_type = drv_type;
     cc_of_global.ofdev_type = dev_type;
 
@@ -278,5 +286,40 @@ int cc_of_dev_register(cc_ofdev_key_t dev_key, cc_ofver_e max_ofver,
     return status;
 }
 
+void
+cc_of_debug_toggle(gboolean debug_on)
+{
+    if (debug_on == TRUE) {
+        CC_LOG_ENABLE_DEBUGS();
+    } else {
+        CC_LOG_DISABLE_DEBUGS();
+    }
+    cc_of_global.ofdebug_enable = debug_on;
+}
 
+void
+cc_of_log_toggle(gboolean logging_on)
+{
+    g_mutex_lock(&cc_of_global.oflog_lock);
+    if (logging_on == TRUE) {
+        cc_of_global.oflog_fd =
+            create_logfile(cc_of_global.oflog_file);
+    } else {
+        fclose(cc_of_global.oflog_fd);
+    }
+    cc_of_global.oflog_enable = logging_on;
+    g_mutex_unlock(&cc_of_global.oflog_lock);    
+}
+    
+char *
+cc_of_log_read()
+{
+    char *log_contents = NULL;
+    g_mutex_lock(&cc_of_global.oflog_lock);
+    if (cc_of_global.oflog_enable) {
+        log_contents = read_logfile(cc_of_global.oflog_file);
+    }
+    g_mutex_unlock(&cc_of_global.oflog_lock);
+    return log_contents;
+}
 

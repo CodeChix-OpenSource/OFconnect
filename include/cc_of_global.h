@@ -5,94 +5,15 @@
 #define CC_OF_GLOBAL_H
 
 #include <glib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <pthread.h>
-#include <assert.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include "cc_net_conn.h"
-#include "cc_log.h"
-#include "cc_pollthr_mgr.h"
 #include "cc_of_lib.h"
-#include "cc_tcp_conn.h"
-#include "cc_udp_conn.h"
-#include "cc_of_util.h"
-
+#include "cc_pollthr_mgr.h"
 
 #define SIZE_RW_THREAD_BUCKET        20
 /* Unused ?? */
 #define MAX_PER_THREAD_RWSOCKETS     200
-#define MAX_PIPE_PER_THR_MGR 1 
-/* Make this 2 now since we have a pipe to buffer msgs ?? */
+#define MAX_PIPE_PER_THR_MGR         0 /* no additional pipes */
 
-#if 0
-/* MOVING THIS TO NET_CONN.H */
-typedef enum of_dev_type_ {
-    SWITCH = 0,
-    CONTROLLER,
-    MAX_OF_DEV_TYPE
-} of_dev_type_e;
-
-typedef enum cc_ofrw_state_ {
-    CC_OF_RW_DOWN = 0,
-    CC_OF_RW_UP
-} cc_ofrw_state_e;
-
-typedef struct cc_ofrw_key_ {
-    int       rw_sockfd;    
-} cc_ofrw_key_t;
-
-typedef struct cc_ofstats_ {
-    uint32_t  rx_pkt;
-    uint32_t  tx_pkt;
-    uint32_t  tx_drops;
-} cc_ofstats_t;
-
-/* node in ofrw_htbl */
-typedef struct cc_ofrw_info_ {
-    cc_ofrw_state_e      state;
-    adpoll_thread_mgr_t  *thr_mgr_p;
-} cc_ofrw_info_t;
-
-typedef struct cc_ofdev_key_ {
-    ipaddr_v4v6_t  controller_ip_addr;
-    ipaddr_v4v6_t  switch_ip_addr;
-    uint16_t       port;
-    L4_type_e      layer4_proto;    
-} cc_ofdev_key_t;
-
-/* node in ofdev_htbl */
-typedef struct cc_ofdev_info_ {
-    uint16_t       controller_L4_port;
-
-    cc_ofver_e     of_max_ver;
-    
-    GList          *ofrw_socket_list; //list of rw sockets
-    GMutex	    ofrw_socket_list_lock;
-
-    cc_of_recv_pkt recv_func;
-
-    int            main_sockfd;
-} cc_ofdev_info_t;
-
-
-/* mapping of channel key (dp-id/aux-id) to rw_sockfd) */
-typedef struct cc_ofchannel_key_ {
-    uint64_t  dp_id;
-    uint8_t   aux_id;
-}cc_ofchannel_key_t;
-
-typedef struct cc_ofchann_info_ {
-    int                   rw_sockfd;
-    int                   count_retries; /* CLIENT: reconnection attempts */
-    cc_ofstats_t          stats;    
-} cc_ofchannel_info_t;
-
-#endif
 
 typedef struct cc_of_global_ {
     /* driver type could be client or server */
@@ -118,6 +39,13 @@ typedef struct cc_of_global_ {
     adpoll_thread_mgr_t  *oflisten_pollthr_p; /* NULL for client */
     
     GList            *ofrw_pollthr_list;
+
+    /* debugs and log file */
+    FILE             *oflog_fd;
+    char             *oflog_file;
+    gboolean         ofdebug_enable;
+    gboolean         oflog_enable;
+    GMutex           oflog_lock;
 } cc_of_global_t;
 
 extern cc_of_global_t cc_of_global;

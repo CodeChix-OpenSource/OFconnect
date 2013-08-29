@@ -1,4 +1,5 @@
 #include "cc_of_global.h"
+#include "cc_of_priv.h"
 
 /*
  * Note: This file will not compile right now. I still need to integrate this

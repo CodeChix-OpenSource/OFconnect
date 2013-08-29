@@ -7,6 +7,7 @@
 #include "cc_net_conn.h"
 
 //error codes
+typedef int cc_of_ret;
 #define CC_OF_OK        0
 #define CC_OF_ESYS     -1  /* syscall, library call error */
 #define CC_OF_EINVAL   -2  /* invalid attribute */
@@ -44,8 +45,6 @@ typedef enum cc_ofver_ {
 
 #define CC_OF_ERRTABLE_SIZE (sizeof(cc_of_errtable) / sizeof(cc_of_errtable[0]))
 
-
-typedef int cc_of_ret;
 
 /**
  * cc_of_recv_pkt
@@ -163,5 +162,34 @@ int
 cc_of_get_conn_stats(cc_ofchannel_key_t chann_id,
 cc_ofstats_t *stats);
 
+/**
+ * cc_of_debug_toggle
+ *
+ * Description:
+ * Enables or disables debug logging
+ */
+void
+cc_of_debug_toggle(gboolean debug_on);
+
+/**
+ * cc_of_log_toggle
+ *
+ * Description:
+ * Enables or disables message logging in global log file
+ */
+void
+cc_of_log_toggle(gboolean logging_on);
+
+/**
+ * cc_of_log_read
+ *
+ * Description:
+ * Read contents of log file.
+ *
+ * NOTE: Necessary to g_free the returned pointer
+ */
+
+char *
+cc_of_log_read();
 
 #endif

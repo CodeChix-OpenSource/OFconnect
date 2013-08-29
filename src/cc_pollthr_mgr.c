@@ -17,7 +17,7 @@ adp_thr_mgr_new(char *tname,
     adpoll_thread_mgr_t *this = NULL;
     adpoll_pollthr_data_t *thread_user_data;
     int tname_len;
-    adpoll_thr_msg_t add_datapipe_msg;    
+    adpoll_thr_msg_t add_datapipe_msg;
 
     this = (adpoll_thread_mgr_t *)malloc(sizeof(adpoll_thread_mgr_t));
     
@@ -32,7 +32,7 @@ adp_thr_mgr_new(char *tname,
     tname_len = i + 1;
     
     this->max_sockets = max_sockets;
-    this->max_pipes = max_pipes + 2; /* 2 additional for internal use */
+    this->max_pipes = max_pipes + 4; /* 4 additional for internal use */
     this->num_pipes = 0;
 
     this->pipes_arr = (int *)malloc(sizeof(int) * 2 * this->max_pipes);
@@ -53,16 +53,21 @@ adp_thr_mgr_new(char *tname,
     thread_user_data->primary_pipe_rd_fd = this->pipes_arr[PRI_PIPE_RD_FD];
     thread_user_data->del_pipe_cv_mutex_p = &(this->del_pipe_cv_mutex);
     thread_user_data->del_pipe_cv_cond_p = &(this->del_pipe_cv_cond);
-    
+    thread_user_data->adp_thr_init_cv_mutex_p =
+        &(this->adp_thr_init_cv_mutex);
+    thread_user_data->adp_thr_init_cv_cond_p =
+        &(this->adp_thr_init_cv_cond);
+
     this->thread_p = g_thread_new(this->tname,
                             (GThreadFunc) adp_thr_mgr_poll_thread_func,
                             thread_user_data);
-    
+
     /* synchronize with thr_mgr_poll_thread_func */
     g_mutex_lock(&this->adp_thr_init_cv_mutex);
     g_cond_wait(&this->adp_thr_init_cv_cond,
-                &this->adp_thr_init_cv_mutex);                
+                &this->adp_thr_init_cv_mutex);
     g_mutex_unlock(&this->adp_thr_init_cv_mutex);
+
     
     add_datapipe_msg.fd_type = PIPE;
     add_datapipe_msg.fd_action = ADD_FD;
@@ -71,30 +76,44 @@ adp_thr_mgr_new(char *tname,
     add_datapipe_msg.pollout_func = NULL;
 
     adp_thr_mgr_add_del_fd(this, &add_datapipe_msg);
+    CC_LOG_DEBUG("%s(%d): new pipe added for data %d",
+                 __FUNCTION__, __LINE__,
+                 this->pipes_arr[DATA_PIPE_WR_FD]);
+    
     return this;
 }
 
 void adp_thr_mgr_free(adpoll_thread_mgr_t *this)
 {
     int i;
+    adpoll_thr_msg_t destruct_msg;
+
+    destruct_msg.fd = this->pipes_arr[PRI_PIPE_RD_FD];
+    destruct_msg.fd_type = PIPE;
+    destruct_msg.fd_action = DELETE_FD;
+    destruct_msg.poll_events = 0;
+    destruct_msg.pollin_func = NULL;
+    destruct_msg.pollout_func = NULL;
+
+    adp_thr_mgr_add_del_fd(this, &destruct_msg);
+    
     /* wait for join */
     g_thread_join (this->thread_p);
-    
+
     for(i=0; i < this->num_pipes; i++) {
         close(this->pipes_arr[i]);
     }
     
     free(this->pipes_arr);
-    free(this);
+//    free(this); - application needs to free the mgr pointer
 
 }
 
 /* Function: adp_thr_mgr_add_del_fd
  * API to create or remove an fd
  * The fd could be either a pipe or a network socket
- * return value: ADD - the newly created wr pipe is returned
- *             : DELETE - returns -1.
- * TBD: add functionality for SOCKET processing
+ * return value: ADD_FD - the newly created wr pipe is returned
+ *             : DELETE_FD - returns -1.
  * Do we need to synchrnize this fn ??
  */
 int
@@ -113,11 +132,13 @@ adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
             if (this->num_pipes == this->max_pipes) {
                 CC_LOG_ERROR("%s(%d) unable to add more pipes - max out",
                              __FUNCTION__, __LINE__);
+                return retval;
             }
             int new_rd_fd_index = this->num_pipes + RD_OFFSET;
             if (pipe(&this->pipes_arr[this->num_pipes]) == -1) {
-                CC_LOG_FATAL("%s(%d): pipe creation failed",__FUNCTION__,
-                             __LINE__);
+                CC_LOG_FATAL("%s(%d): pipe creation failed",
+                             __FUNCTION__, __LINE__);
+                return retval;
             }
             CC_LOG_DEBUG("%s(%d): new pipes created. rd: %d  wr: %d",
                          __FUNCTION__, __LINE__,
@@ -218,10 +239,26 @@ adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
         }
     } else if (msg->fd_type == SOCKET) {
         if (msg->fd_action == ADD_FD) {
-            CC_LOG_DEBUG("%s(%d) socket ADD", __FUNCTION__, __LINE__);
+            CC_LOG_DEBUG("%s(%d) socket %d ADD",
+                         __FUNCTION__, __LINE__, msg->fd);
+
+            if (this->num_sockets == this->max_sockets) {
+                CC_LOG_ERROR("%s(%d) unable to add more sockets - "
+                             "max out", __FUNCTION__, __LINE__);
+                return retval;
+            }
+            (this->num_sockets)++;
+            write(this->pipes_arr[PRI_PIPE_WR_FD],
+                  msg, sizeof(adpoll_thr_msg_t));
+            
+            retval = msg->fd;
 
         } else if (msg->fd_action == DELETE_FD) {
-            CC_LOG_DEBUG("%s(%d) socket ADD", __FUNCTION__, __LINE__);
+            CC_LOG_DEBUG("%s(%d) socket %d DELETE",
+                         __FUNCTION__, __LINE__, msg->fd);
+            write(this->pipes_arr[PRI_PIPE_WR_FD],
+                  msg, sizeof(adpoll_thr_msg_t));
+            (this->num_sockets)--;            
         }
     }
     return retval;
@@ -510,7 +547,7 @@ adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p)
     CC_LOG_DEBUG("%s(%d)[%s]: reading on fd %d",
                  __FUNCTION__, __LINE__, pollthr_name,
                  thr_pvt_p->pollfd_arr[0].fd);
-
+    
     /* synchronize completion of thread initialization */
     g_mutex_lock(pollthr_data_p->adp_thr_init_cv_mutex_p);
     g_cond_signal(pollthr_data_p->adp_thr_init_cv_cond_p);

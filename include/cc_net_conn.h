@@ -36,28 +36,6 @@ typedef enum of_dev_type_ {
     MAX_OF_DEV_TYPE
 } of_dev_type_e;
 
-typedef enum cc_ofrw_state_ {
-    CC_OF_RW_DOWN = 0,
-    CC_OF_RW_UP
-} cc_ofrw_state_e;
-
-typedef struct cc_ofrw_key_ {
-    int       rw_sockfd;    
-} cc_ofrw_key_t;
-
-typedef struct cc_ofstats_ {
-    uint32_t  rx_pkt;
-    uint32_t  tx_pkt;
-    uint32_t  tx_drops;
-} cc_ofstats_t;
-
-/* node in ofrw_htbl */
-typedef struct cc_ofrw_info_ {
-    cc_ofrw_state_e      state;
-    adpoll_thread_mgr_t  *thr_mgr_p;
-} cc_ofrw_info_t;
-
-
 typedef struct cc_ofdev_key_ {
     ipaddr_v4v6_t  controller_ip_addr;
     ipaddr_v4v6_t  switch_ip_addr; 
@@ -77,6 +55,29 @@ typedef struct cc_ofdev_info_ {
 
     int            main_sockfd;
 } cc_ofdev_info_t;
+
+typedef enum cc_ofrw_state_ {
+    CC_OF_RW_DOWN = 0,
+    CC_OF_RW_UP
+} cc_ofrw_state_e;
+
+typedef struct cc_ofrw_key_ {
+    int       rw_sockfd;    
+} cc_ofrw_key_t;
+
+typedef struct cc_ofstats_ {
+    uint32_t  rx_pkt;
+    uint32_t  tx_pkt;
+    uint32_t  tx_drops;
+} cc_ofstats_t;
+
+/* node in ofrw_htbl */
+typedef struct cc_ofrw_info_ {
+    cc_ofrw_state_e      state;
+    adpoll_thread_mgr_t  *thr_mgr_p;
+    cc_ofdev_key_t       *dev_key_p; //DEEPA: INCOMPLETE 
+} cc_ofrw_info_t;
+
 
 
 /* mapping of channel key (dp-id/aux-id) to rw_sockfd) */

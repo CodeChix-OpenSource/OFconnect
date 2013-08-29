@@ -5,6 +5,9 @@
 #define CC_OF_UTIL_H
 
 #include "cc_of_global.h"
+#include "cc_net_conn.h"
+#include "cc_pollthr_mgr.h"
+#include "cc_log.h"
 
 #ifndef UNUSED
 #define UNUSED __attribute__ ((__unused__))

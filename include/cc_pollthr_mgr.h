@@ -79,6 +79,8 @@
 #include <errno.h>
 #include <assert.h>
 
+#define G_ERRORCHECK_MUTEXES
+
 /* length of name string for Polling Thread */
 #define MAX_NAME_LEN   16
 

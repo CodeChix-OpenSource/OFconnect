@@ -5,6 +5,9 @@
 #define CC_OF_UTIL_H
 
 #include "cc_of_global.h"
+#include "cc_net_conn.h"
+#include "cc_pollthr_mgr.h"
+#include "cc_log.h"
 
 #ifndef UNUSED
 #define UNUSED __attribute__ ((__unused__))
@@ -54,8 +57,8 @@ del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock);
 
 cc_of_ret
 atomic_add_upd_htbls_with_rwsocket(int sockfd, 
-				                   adpoll_thread_mgr_t  *thr_mgr,
-				                   cc_ofdev_key_t key,
+                                   adpoll_thread_mgr_t  *thr_mgr,
+                                   cc_ofdev_key_t key,
                                    L4_type_e layer4_proto);
 
 /* POLLTHR utilities */

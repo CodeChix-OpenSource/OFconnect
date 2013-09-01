@@ -68,8 +68,7 @@ del_ofrw_rwsocket(int del_fd)
 }
 
 cc_of_ret
-add_upd_ofrw_rwsocket(int add_fd,
-                      adpoll_thread_mgr_t  *thr_mgr_p,
+add_upd_ofrw_rwsocket(int add_fd, adpoll_thread_mgr_t  *thr_mgr_p,
                       L4_type_e layer4_proto,
                       cc_ofdev_key_t key)
 {

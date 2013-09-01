@@ -57,7 +57,6 @@ pollthread_start(test_data_t *tdata,
     g_assert(tdata->liblog != NULL);
 
     g_free(temp_mgr_p);
-//    g_assert(tdata->tp != NULL);
 }
 
 static void
@@ -86,6 +85,7 @@ pollthread_init(test_data_t *tdata,
 
     g_test_message("test - output of log follows");
     g_test_message("%s",tdata->liblog);
+    /* use regex features of glib */
     //get pri pipe - compare with log
     //get data pipe - compare with log
 

@@ -68,7 +68,9 @@ del_ofrw_rwsocket(int del_fd)
 }
 
 cc_of_ret
-add_upd_ofrw_rwsocket(int add_fd, adpoll_thread_mgr_t  *thr_mgr_p)
+add_upd_ofrw_rwsocket(int add_fd,
+                      adpoll_thread_mgr_t  *thr_mgr_p,
+                      cc_ofdev_key_t key)
 {
     cc_ofrw_key_t *ofrw_key;
     cc_ofrw_info_t *ofrw_info;
@@ -81,6 +83,7 @@ add_upd_ofrw_rwsocket(int add_fd, adpoll_thread_mgr_t  *thr_mgr_p)
     ofrw_key->rw_sockfd = add_fd;
     ofrw_info->state = CC_OF_RW_DOWN;
     ofrw_info->thr_mgr_p = thr_mgr_p;
+    memcpy(&(ofrw_info->dev_key), &key, sizeof(cc_ofdev_key_t));
 
     rc = update_global_htbl(OFRW, ADD,
                             ofrw_key, ofrw_info,
@@ -205,7 +208,7 @@ atomic_add_upd_ofrw_ofdev_rwsocket(int sockfd, adpoll_thread_mgr_t  *thr_mgr,
 {
     cc_of_ret status = CC_OF_OK;
 
-    if((status = add_upd_ofrw_rwsocket(sockfd, thr_mgr)) < 0) {
+    if((status = add_upd_ofrw_rwsocket(sockfd, thr_mgr, key)) < 0) {
         CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
         return status;
     } else {
@@ -371,7 +374,7 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, adpoll_thr_msg_t *thr_msg)
 
     if (rwinfo_p) {
         //ofrw_socket_list in device
-        del_ofdev_rwsocket(*(rwinfo_p->dev_key_p), thr_msg->fd);
+        del_ofdev_rwsocket(rwinfo_p->dev_key, thr_msg->fd);
 
     }
     //cc_of_global.ofrw_htbl - cc_ofrw_info_t

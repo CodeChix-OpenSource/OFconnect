@@ -75,7 +75,8 @@ typedef struct cc_ofstats_ {
 typedef struct cc_ofrw_info_ {
     cc_ofrw_state_e      state;
     adpoll_thread_mgr_t  *thr_mgr_p;
-    cc_ofdev_key_t       *dev_key_p; //DEEPA: INCOMPLETE 
+    cc_ofdev_key_t       dev_key;   /* needed for easier lookup of
+                                       device given the rwsocket */
 } cc_ofrw_info_t;
 
 

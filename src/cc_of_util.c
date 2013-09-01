@@ -2,7 +2,6 @@
 /* Copyright: CodeChix Bay Area Chapter 2013                                   */
 /*-----------------------------------------------------------------------------*/
 #include "cc_of_util.h"
-
 /*-----------------------------------------------------------------------*/
 /* Utilities to manage the global hash tables                            */
 /*-----------------------------------------------------------------------*/
@@ -70,7 +69,8 @@ del_ofrw_rwsocket(int del_fd)
 
 cc_of_ret
 add_upd_ofrw_rwsocket(int add_fd, adpoll_thread_mgr_t  *thr_mgr_p,
-                      L4_type_e layer4_proto)
+                      L4_type_e layer4_proto,
+                      cc_ofdev_key_t key)
 {
     cc_ofrw_key_t *ofrw_key;
     cc_ofrw_info_t *ofrw_info;
@@ -83,6 +83,7 @@ add_upd_ofrw_rwsocket(int add_fd, adpoll_thread_mgr_t  *thr_mgr_p,
     ofrw_key->rw_sockfd = add_fd;
     ofrw_info->state = CC_OF_RW_DOWN;
     ofrw_info->thr_mgr_p = thr_mgr_p;
+    memcpy(&(ofrw_info->dev_key), &key, sizeof(cc_ofdev_key_t));
     ofrw_info->layer4_proto = layer4_proto;
 
     rc = update_global_htbl(OFRW, ADD,
@@ -227,7 +228,7 @@ atomic_add_upd_htbls_with_rwsocket(int sockfd, adpoll_thread_mgr_t  *thr_mgr,
     cc_of_ret status = CC_OF_OK;
     cc_ofchannel_key_t chann_key;
 
-    if((status = add_upd_ofrw_rwsocket(sockfd, thr_mgr, layer4_proto)) < 0) {
+    if((status = add_upd_ofrw_rwsocket(sockfd, thr_mgr, layer4_proto, key)) < 0) {
         CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
         return status;
     } 
@@ -317,6 +318,7 @@ cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t **tmgr,
     if (adp_thr_mgr_get_num_avail_sockfd(
             (adpoll_thread_mgr_t *)(elem->data)) == 0) {
         CC_LOG_DEBUG("%s(%d) - socket capacity exhausted. create new poll thr",
+    /* TODO: Finish this impl */
                     __FUNCTION__, __LINE__);
         return(cc_create_rw_pollthr(tmgr, max_sockets, max_pipes));
     }    
@@ -349,25 +351,31 @@ cc_pollthr_list_compare_func(adpoll_thread_mgr_t *tmgr1,
     return 0;
 }
 
-// changed argument fd to thr_msg
-// commented for compiling
 cc_of_ret
 cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, adpoll_thr_msg_t *thr_msg)
 {
-    tmgr = NULL;
-    thr_msg = NULL;
+    cc_ofrw_key_t rwkey;
+    cc_ofrw_info_t *rwinfo_p = NULL;
+    GList *tmp_list = NULL;
+    adpoll_thread_mgr_t  *tmp_tmgr = NULL;
     
-    CC_LOG_ERROR("%s NOT IMPLEMENTED, %p, %p", __FUNCTION__, tmgr, thr_msg);
-   
+    CC_LOG_DEBUG("%s(%d) Thread: %s, fd: %d, type: %s", __FUNCTION__,
+                 __LINE__, tmgr->tname, thr_msg->fd,
+                 (thr_msg->fd_type == PIPE)? "pipe":"socket");
 
-    /* TODO: Finish this impl */
-    /*GList *tmp_list = NULL;
-    adpoll_thread_mgr_t *tmp_tmgr = NULL;
+    if ((tmgr == NULL) || (thr_msg == NULL)) {
+        CC_LOG_ERROR("%s(%d): invalid parameters",
+                     __FUNCTION__, __LINE__);
+        return CC_OF_EINVAL;
+    }
+    if (thr_msg->fd_action != DELETE_FD) {
+        CC_LOG_ERROR("%s(%d): incorrect action request",
+                     __FUNCTION__, __LINE__);
+        return CC_OF_EINVAL;
+    }
     
-    thr_msg.fd_action = DELETE_FD;
+    adp_thr_mgr_add_del_fd(tmgr, thr_msg);
     
-    adp_thr_mgr_add_del_fd(tmgr, &thr_msg);
-
     if (cc_get_count_rw_pollthr() == 1) {
         // no sorting required with only 1 thread 
         CC_LOG_DEBUG("%s(%d): only one poll thread. skip sorting",
@@ -380,7 +388,7 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, adpoll_thr_msg_t *thr_msg)
         CC_LOG_ERROR("%s(%d): could not find thread manager %s "
                      "in ofrw_pollthr_list",
                      __FUNCTION__, __LINE__, tmgr->tname);
-        return(CC_OF_EGEN);
+        return(CC_OF_EMISC);
     }
     tmp_tmgr = (adpoll_thread_mgr_t *)tmp_list->data;
     cc_of_global.ofrw_pollthr_list =
@@ -392,11 +400,20 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, adpoll_thr_msg_t *thr_msg)
         tmgr,
         (GCompareFunc)cc_pollthr_list_compare_func);
 
-    // TODO: clean out this fd from global structures 
-//    ofrw_socket_list in device
-//    cc_of_global.ofrw_htbl - cc_ofrw_info_t
+    rwkey.rw_sockfd = thr_msg->fd;
+    rwinfo_p = g_hash_table_lookup(cc_of_global.ofrw_htbl, &rwkey);
+
+    if (rwinfo_p) {
+        //ofrw_socket_list in device
+        del_ofdev_rwsocket(rwinfo_p->dev_key, thr_msg->fd);
+
+    }
+    //cc_of_global.ofrw_htbl - cc_ofrw_info_t
+    del_ofrw_rwsocket(thr_msg->fd);
+    
     //delete from ofchannel_htbl - cc_ofchannel_info_t
-*/
+    del_ofchann_rwsocket(thr_msg->fd);
+
     return (CC_OF_OK);
 
 }
@@ -422,7 +439,7 @@ cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key,
 	
 	    /* add fd to global structures */
 	    status = atomic_add_upd_htbls_with_rwsocket(thr_msg->fd, tmgr, key, 
-                                                    layer4_proto);
+                                                        layer4_proto);
 	    if (status < 0) {
 	        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
                          cc_of_strerror(status));

@@ -192,4 +192,15 @@ cc_of_log_toggle(gboolean logging_on);
 char *
 cc_of_log_read();
 
+/**
+ * cc_of_log_clear
+ *
+ * Description:
+ * Clear contents of log file.
+ *
+ */
+
+void
+cc_of_log_clear(void);
+
 #endif

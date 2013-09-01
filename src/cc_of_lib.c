@@ -323,3 +323,19 @@ cc_of_log_read()
     return log_contents;
 }
 
+void
+cc_of_log_clear()
+{
+    char clearlog[176];
+    sprintf(clearlog, "cat /dev/null > %s", cc_of_global.oflog_file);
+    system(clearlog);
+}
+
+int
+cc_of_lib_free()
+{
+    /* TODO: INCOMPLETE */
+    g_free(cc_of_global.oflog_file);
+    g_free(cc_of_global.oflog_fd);
+    return CC_OF_OK;
+}

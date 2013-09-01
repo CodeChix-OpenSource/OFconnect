@@ -186,6 +186,9 @@ int adp_thr_mgr_get_pri_pipe_wr(adpoll_thread_mgr_t *this);
 /* return value: write pipe fd */
 int adp_thr_mgr_get_data_pipe_wr(adpoll_thread_mgr_t *this);
 
+/* return value: read pipe fd */
+int adp_thr_mgr_get_data_pipe_rd(adpoll_thread_mgr_t *this);
+
 uint32_t adp_thr_mgr_get_num_avail_sockfd(adpoll_thread_mgr_t *this);
 
 void adp_thr_mgr_free(adpoll_thread_mgr_t *this);

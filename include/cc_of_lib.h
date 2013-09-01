@@ -62,8 +62,8 @@ typedef int cc_of_ret;
  *
  */
 typedef int (*cc_of_recv_pkt)(cc_ofchannel_key_t chann_id,
-                               void *of_msg, 
-                               uint32_t *of_msg_len);
+                              void *of_msg, 
+                              size_t of_msg_len);
 
 /**
  * cc_of_lib_init
@@ -95,7 +95,9 @@ cc_of_lib_abort(void);
 
 
 int
-cc_of_dev_register(cc_ofdev_key_t dev_key,
+cc_of_dev_register(ipaddr_v4v6_t controller_ip_addr,
+                   ipaddr_v4v6_t switch_ip_addr,
+                   uint16_t controller_L4_port,
                    cc_ofver_e max_ofver,
                    cc_of_recv_pkt recv_func /*func ptr*/);
 /* possible additional fields for TLS certificate */
@@ -117,8 +119,6 @@ cc_of_dev_free(cc_ofdev_key_t dev_key);
 int 
 cc_of_create_channel(cc_ofdev_key_t dev_key,
                      cc_ofchannel_key_t chann_id); /*noop for controller */
-// Port val as argument ??
-
 /**
  * cc_of_destroy_channel
  *
@@ -147,7 +147,7 @@ cc_of_destroy_channel(cc_ofchannel_key_t chann_id); /*noop for controller */
  */
 int
 cc_of_send_pkt(cc_ofchannel_key_t chann_id, void *of_msg, 
-                   uint32_t msg_len);
+                   size_t msg_len);
 
 /**
  * cc_of_get_conn_stats

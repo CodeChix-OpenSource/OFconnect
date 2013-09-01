@@ -114,7 +114,8 @@ void adp_thr_mgr_free(adpoll_thread_mgr_t *this)
  * The fd could be either a pipe or a network socket
  * return value: ADD_FD - the newly created wr pipe is returned
  *             : DELETE_FD - returns -1.
- * Do we need to synchrnize this fn ??
+ * TODO (IMPORTANT): synchrnize this fn
+ * return val??
  */
 int
 adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
@@ -637,3 +638,12 @@ adp_thr_mgr_get_data_pipe_wr(adpoll_thread_mgr_t *this)
 {
     return(this->pipes_arr[DATA_PIPE_WR_FD]);
 }
+
+
+/* return value: read pipe fd */
+int
+adp_thr_mgr_get_data_pipe_rd(adpoll_thread_mgr_t *this)
+{
+    return(this->pipes_arr[DATA_PIPE_RD_FD]);
+}
+

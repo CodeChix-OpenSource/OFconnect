@@ -112,9 +112,17 @@ void adp_thr_mgr_free(adpoll_thread_mgr_t *this)
 /* Function: adp_thr_mgr_add_del_fd
  * API to create or remove an fd
  * The fd could be either a pipe or a network socket
+<<<<<<< HEAD
  * return value: ADD_FD - the newly created wr pipe is returned
  *             : DELETE_FD - returns -1.
  * Do we need to synchrnize this fn ??
+=======
+ * return value: ADD - the newly created wr pipe is returned
+ *             : DELETE - returns -1.
+ * TBD: add functionality for SOCKET processing
+ * TODO (IMPORTANT): synchrnize this fn
+ * return val??
+>>>>>>> 5e67cca... Finished up TCP netsvcs
  */
 int
 adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
@@ -637,3 +645,12 @@ adp_thr_mgr_get_data_pipe_wr(adpoll_thread_mgr_t *this)
 {
     return(this->pipes_arr[DATA_PIPE_WR_FD]);
 }
+
+
+/* return value: read pipe fd */
+int
+adp_thr_mgr_get_data_pipe_rd(adpoll_thread_mgr_t *this)
+{
+    return(this->pipes_arr[DATA_PIPE_RD_FD]);
+}
+

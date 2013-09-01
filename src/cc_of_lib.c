@@ -28,10 +28,8 @@ gboolean cc_ofdev_htbl_equal_func(gconstpointer a, gconstpointer b)
     b_dev = (cc_ofdev_key_t *)b;
 
     if ((a_dev->controller_ip_addr == b_dev->controller_ip_addr) && 
-	(a_dev->switch_ip_addr == b_dev->switch_ip_addr) &&
-    (a_dev->controller_L4_port == b_dev->controller_L4_port) &&
-	(a_dev->switch_L4_port == b_dev->switch_L4_port) &&
-    (a_dev->layer4_proto == b_dev->layer4_proto )) {
+	    (a_dev->switch_ip_addr == b_dev->switch_ip_addr) &&
+        (a_dev->controller_L4_port == b_dev->controller_L4_port)) {
 	    return TRUE;
     } else {
 	    return FALSE;
@@ -177,48 +175,18 @@ cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type)
 }
 
 
-static void process_listenfd_pollin_func(char *tname UNUSED, void *data) {
-    
-    adpoll_fd_info_t *data_p = (adpoll_fd_info_t *)data;
-    int listenfd;    
-
-    if (!data_p) {
-        CC_LOG_INFO("%s(%d): %s", __FUNCTION__, __LINE__,
-                    "Invalid data passed to listenfd callback."
-                    "Cannot accept new connection.");
-        return;
-    }
-    
-    listenfd = data_p->fd;
-
-    /* 
-     * Do a reverse lookup to get the dev_key 
-     * corresponding to this listenfd
-     *
-     */
-    GHashTableIter ofdev_iter;
-    cc_ofdev_key_t *dev_key;
-    cc_ofdev_info_t *dev_info;
-    g_hash_table_iter_init(&ofdev_iter, cc_of_global.ofdev_htbl);
-    if (g_hash_table_iter_next(&ofdev_iter, (gpointer *)&dev_key, (gpointer *)&dev_info)) {
-        if (dev_info->main_sockfd == listenfd) {
-            // Call NetSVCS Accept
-            cc_of_global.NET_SVCS[dev_key->layer4_proto].accept_conn(listenfd);
-        }
-    }
-
-}
-
 
 // TODO: switch case for switch
-int cc_of_dev_register(cc_ofdev_key_t dev_key, cc_ofver_e max_ofver, 
+int cc_of_dev_register(ipaddr_v4v6_t controller_ip_addr, 
+                       ipaddr_v4v6_t switch_ip_addr, 
+                       uint16_t controller_L4_port,
+                       cc_ofver_e max_ofver, 
                        cc_of_recv_pkt recv_func) {
     cc_of_ret status = CC_OF_OK;
     cc_ofdev_key_t *key;
     cc_ofdev_info_t *dev_info;
     char switch_ip[INET_ADDRSTRLEN];
     char controller_ip[INET_ADDRSTRLEN]; 
-
    
     key = g_malloc0(sizeof(cc_ofdev_key_t));
     if (key == NULL) {
@@ -228,11 +196,9 @@ int cc_of_dev_register(cc_ofdev_key_t dev_key, cc_ofver_e max_ofver,
 	    return status;
     }
 
-    key->controller_ip_addr = dev_key.controller_ip_addr;
-    key->switch_ip_addr = dev_key.switch_ip_addr;
-    key->controller_L4_port = dev_key.controller_L4_port;
-    key->switch_L4_port = dev_key.switch_L4_port;
-    key->layer4_proto = dev_key.layer4_proto;
+    key->controller_ip_addr = controller_ip_addr;
+    key->switch_ip_addr = switch_ip_addr;
+    key->controller_L4_port = controller_L4_port;
 
     inet_ntop(AF_INET, &key->switch_ip_addr, switch_ip, sizeof(switch_ip));
     inet_ntop(AF_INET, &key->controller_ip_addr, controller_ip,
@@ -252,36 +218,34 @@ int cc_of_dev_register(cc_ofdev_key_t dev_key, cc_ofver_e max_ofver,
 
     dev_info->recv_func = recv_func;
 
-    dev_info->main_sockfd =
-        cc_of_global.NET_SVCS[key->layer4_proto].open_serverfd(*key);
-    if (dev_info->main_sockfd < 0) {
+    // Create a TCP sockfd for tcp connections
+    dev_info->main_sockfd_tcp =
+        cc_of_global.NET_SVCS[TCP].open_serverfd(*key);
+    if (dev_info->main_sockfd_tcp < 0) {
 	    status = CC_OF_EMISC;
 	    CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__,
                      cc_of_strerror(status));
 	    return status;
     }
 
-    // Add listenfd to the global oflisten_pollthr
-    adpoll_thr_msg_t thr_msg;
-
-    thr_msg.fd = dev_info->main_sockfd;
-    thr_msg.fd_type = SOCKET;
-    thr_msg.fd_action = ADD;
-    thr_msg.poll_events = POLLIN;
-    thr_msg.pollin_func = &process_listenfd_pollin_func;
-    thr_msg.pollin_user_data = NULL; 
-    thr_msg.pollout_func = NULL;
-    thr_msg.pollout_user_data = NULL;
-
-    adp_thr_mgr_add_del_fd(cc_of_global.oflisten_pollthr_p, &thr_msg);
-    CC_LOG_INFO("%s(%d): %s ,controllerIP:%s switchIP:%s,"
-                "layer4Prot:%d", __FUNCTION__, __LINE__, 
-                "CC_OF_DEV initilaized successfully", 
-                controller_ip, switch_ip, key->layer4_proto);
+    // Create a udp sockfd for udp connections
+    dev_info->main_sockfd_udp =
+        cc_of_global.NET_SVCS[UDP].open_serverfd(*key);
+    if (dev_info->main_sockfd_udp < 0) {
+	    status = CC_OF_EMISC;
+	    CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__,
+                     cc_of_strerror(status));
+	    return status;
+    }
 
     // Add this new device entry to ofdev_htbl
     g_hash_table_insert(cc_of_global.ofdev_htbl, (gpointer)key, 
                         (gpointer)dev_info);
+
+    CC_LOG_INFO("%s(%d): %s , controllerIP:%s, switchIP:%s,"
+                "controllerPort:%hu",__FUNCTION__, __LINE__, 
+                "CC_OF_DEV initilaized successfully", 
+                controller_ip, switch_ip, controller_L4_port);
 
     return status;
 }

@@ -68,9 +68,14 @@ del_ofrw_rwsocket(int del_fd)
 }
 
 cc_of_ret
+<<<<<<< HEAD
 add_upd_ofrw_rwsocket(int add_fd,
                       adpoll_thread_mgr_t  *thr_mgr_p,
                       cc_ofdev_key_t key)
+=======
+add_upd_ofrw_rwsocket(int add_fd, adpoll_thread_mgr_t  *thr_mgr_p,
+                      L4_type_e layer4_proto)
+>>>>>>> 5e67cca... Finished up TCP netsvcs
 {
     cc_ofrw_key_t *ofrw_key;
     cc_ofrw_info_t *ofrw_info;
@@ -83,7 +88,11 @@ add_upd_ofrw_rwsocket(int add_fd,
     ofrw_key->rw_sockfd = add_fd;
     ofrw_info->state = CC_OF_RW_DOWN;
     ofrw_info->thr_mgr_p = thr_mgr_p;
+<<<<<<< HEAD
     memcpy(&(ofrw_info->dev_key), &key, sizeof(cc_ofdev_key_t));
+=======
+    ofrw_info->layer4_proto = layer4_proto;
+>>>>>>> 5e67cca... Finished up TCP netsvcs
 
     rc = update_global_htbl(OFRW, ADD,
                             ofrw_key, ofrw_info,
@@ -94,6 +103,24 @@ add_upd_ofrw_rwsocket(int add_fd,
     return rc;
 }
 
+cc_of_ret
+find_thrmgr_rwsocket(int sockfd, 
+                     adpoll_thread_mgr_t **tmgr) {
+    cc_of_ret status = CC_OF_OK;
+    cc_ofrw_key_t rwkey;
+    cc_ofrw_info_t *rwinfo = NULL;
+    
+    rwkey.rw_sockfd = sockfd;
+    rwinfo = g_hash_table_lookup(cc_of_global.ofrw_htbl, &rwkey);
+    if (rwinfo == NULL) {
+        CC_LOG_ERROR("%s(%d): could not find rwsock %d in ofrw_htbl",
+                     __FUNCTION__, __LINE__, rwkey.rw_sockfd);
+        return CC_OF_EHTBL;
+    }
+    
+    *tmgr = rwinfo->thr_mgr_p;
+    return status;
+}
 
 cc_of_ret
 add_upd_ofchann_rwsocket(cc_ofchannel_key_t key,
@@ -203,24 +230,40 @@ del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
 }
 
 cc_of_ret
-atomic_add_upd_ofrw_ofdev_rwsocket(int sockfd, adpoll_thread_mgr_t  *thr_mgr, 
-                                   cc_ofdev_key_t key)
+atomic_add_upd_htbls_with_rwsocket(int sockfd, adpoll_thread_mgr_t  *thr_mgr, 
+                                   cc_ofdev_key_t key, L4_type_e layer4_proto)
 {
     cc_of_ret status = CC_OF_OK;
+    cc_ofchannel_key_t chann_key;
 
+<<<<<<< HEAD
     if((status = add_upd_ofrw_rwsocket(sockfd, thr_mgr, key)) < 0) {
+=======
+    if((status = add_upd_ofrw_rwsocket(sockfd, thr_mgr, layer4_proto)) < 0) {
+>>>>>>> 5e67cca... Finished up TCP netsvcs
         CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
         return status;
-    } else {
-	    if ((status = add_ofdev_rwsocket(key, sockfd)) < 0) {
-	        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
-	        del_ofrw_rwsocket(sockfd);
-	        return status;
-	    } else {
-	        CC_LOG_DEBUG("%s(%d): Atomically added sockfd to ofrw & ofdev htbls", __FUNCTION__, __LINE__);
-	        return status;
-	    }
-    }    
+    } 
+
+	if ((status = add_ofdev_rwsocket(key, sockfd)) < 0) {
+	     CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
+	     del_ofrw_rwsocket(sockfd);
+	     return status;
+	} 
+    
+    /* update ofchannel htbl */
+    chann_key.dp_id = sockfd;
+    chann_key.aux_id = sockfd;
+    if ((status = add_upd_ofchann_rwsocket(chann_key, sockfd)) < 0) {
+         CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
+         del_ofdev_rwsocket(key, sockfd);
+         del_ofrw_rwsocket(sockfd);
+         return status;
+    }
+	CC_LOG_DEBUG("%s(%d): Atomically added sockfd to ofrw & ofdev"
+                 "htbls", __FUNCTION__, __LINE__);
+    
+    return status;
 }
 
 
@@ -388,15 +431,18 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, adpoll_thr_msg_t *thr_msg)
 }
 
 cc_of_ret
-cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key)
+cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key,
+                         L4_type_e layer4_proto)
 {
     cc_of_ret status = CC_OF_OK;
     adpoll_thread_mgr_t *tmgr = NULL;
 
     /* find or create a poll thread */
-    status = cc_find_or_create_rw_pollthr(&tmgr, MAX_PER_THREAD_RWSOCKETS, MAX_PIPE_PER_THR_MGR);
+    status = cc_find_or_create_rw_pollthr(&tmgr, MAX_PER_THREAD_RWSOCKETS,
+                                          MAX_PIPE_PER_THR_MGR);
     if(status < 0) {
-        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
+        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
+                     cc_of_strerror(status));
         return status;
     } else {
 	    /* add the fd to the thr */
@@ -404,15 +450,43 @@ cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key)
 	    adp_thr_mgr_add_del_fd(tmgr, thr_msg);
 	
 	    /* add fd to global structures */
-	    status = atomic_add_upd_ofrw_ofdev_rwsocket(thr_msg->fd, tmgr, key);
+	    status = atomic_add_upd_htbls_with_rwsocket(thr_msg->fd, tmgr, key, 
+                                                    layer4_proto);
 	    if (status < 0) {
-	        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
+	        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
+                         cc_of_strerror(status));
 	        /* Del fd from thr_mgr if update of global structures fails */
-            cc_del_sockfd_rw_pollthr(tmgr, thr_msg);
-            // adp_thr_mgr_add_del_fd  ??? 
+            cc_del_sockfd_rw_pollthr(tmgr, thr_msg); 
 	        return status;
 	    }
     }
 
     return status;
+}
+
+/* return: CC_OF_OK on success
+ *         actual_len set to the len of pkt to be sent out
+ *         actual_len set to 0 when there is no data to be 
+ *         sent out on sockfd
+ */
+cc_of_ret cc_read_pkt_pollthr(adpoll_thread_mgr_t *this UNUSED, 
+                              int sockfd UNUSED, void *buf UNUSED,
+                              size_t buf_len UNUSED,
+                              size_t *actual_len UNUSED) {
+
+    /* TODO: Implement this */
+    CC_LOG_ERROR("%s NOT IMPLEMENTED", __FUNCTION__);
+    
+    /* Read a pkt from the data pipe of this */
+
+    /* Check if the pkt needs to go out on sockfd */
+
+    /* If not add it to global pkt_buf of this */
+
+    /* Continue reading pkts from data pipe till 
+     * we get the pkt that needs to
+     * go out on sockfd
+     */
+    return CC_OF_OK;
+
 }

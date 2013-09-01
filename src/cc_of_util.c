@@ -228,7 +228,7 @@ atomic_add_upd_htbls_with_rwsocket(int sockfd, adpoll_thread_mgr_t  *thr_mgr,
     cc_of_ret status = CC_OF_OK;
     cc_ofchannel_key_t chann_key;
 
-    if((status = add_upd_ofrw_rwsocket(sockfd, thr_mgr, key, layer4_proto)) < 0) {
+    if((status = add_upd_ofrw_rwsocket(sockfd, thr_mgr, layer4_proto, key)) < 0) {
         CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
         return status;
     } 

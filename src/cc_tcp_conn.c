@@ -1,5 +1,5 @@
 #include "cc_of_global.h"
-#include "cc_net_conn.h"
+#include "cc_of_priv.h"
 
 // Number of backlog connection requests
 #define LISTENQ 1024

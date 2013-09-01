@@ -39,6 +39,9 @@ CFLAGS := $(shell pkg-config --cflags glib-2.0) \
 	-Wl,-export-dynamic
 LDFLAGS:= -shared -Wl,-soname,$(SONAME)
 
+TCFLAGS := $(shell pkg-config --cflags glib-2.0) \
+	$(INCLUDES) -Wall -Wextra -g 
+
 .PHONY: objects
 objects: $(OBJS)
 
@@ -83,3 +86,7 @@ install:
 	ln -sf $(COMLIB)/$(SONAME) $(COMLIB)/$(LIBNAME)
 	cp $(INCLDIR)/cc_of_lib.h $(COMINCL)/
 
+.PHONY: test
+test: $(OBJS)
+	$(CC) -c tests/pollthr_test.c -o tests/pollthr_test.o $(TCFLAGS)
+	$(CC) $(OBJS) tests/pollthr_test.o -o tests/pollthr_test $(LIBS)

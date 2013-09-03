@@ -47,17 +47,23 @@ create_logfile(char *logfile)
         printf("error - %s\n", g_strerror(errno));
     }
 
-    logfd = g_fopen(logfile,"a+");
+    logfd = g_fopen(logfile,"a+r");
     return logfd;
 }
 
 /* MUST Remember to call g_free for returned pointer */
+/* MUST remember to call this inside corresponding lock */
 char *
-read_logfile(char *logfile)
+read_logfile()
 {
     char *logdata = NULL;
     GError *logerr = NULL;
-    g_file_get_contents (logfile, &logdata, NULL, &logerr);
+
+    fclose(cc_of_global.oflog_fd);
+    cc_of_global.oflog_fd = g_fopen(cc_of_global.oflog_file,"r");
+
+    g_file_get_contents (cc_of_global.oflog_file,
+                         &logdata, NULL, &logerr);
     
     g_assert ((logdata == NULL && logerr != NULL) ||
               (logdata != NULL && logerr == NULL));
@@ -68,15 +74,23 @@ read_logfile(char *logfile)
                      __FUNCTION__, __LINE__, logerr->message);
         g_error_free(logerr);
     }
+    
+    CC_LOG_DEBUG_NOLOG("%s(%d): size of log file contents: %d",
+                       __FUNCTION__, __LINE__, (uint)strlen(logdata));
+
+    fclose(cc_of_global.oflog_fd);
+    cc_of_global.oflog_fd = g_fopen(cc_of_global.oflog_file,"a+");
+
     return logdata;
 }
 
 void
 write_logfile_lock(char *msg)
 {
+    int n=0;
     g_mutex_lock(&cc_of_global.oflog_lock);
     if (cc_of_global.oflog_enable) {
-        fprintf(cc_of_global.oflog_fd, "%s", msg);
+        n=fprintf(cc_of_global.oflog_fd, "%s", msg);
     }
     g_mutex_unlock(&cc_of_global.oflog_lock);
 }

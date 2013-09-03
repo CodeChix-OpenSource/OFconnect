@@ -180,10 +180,14 @@ adp_thr_mgr_new(char *tname,
 int adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
                             adpoll_thr_msg_t    *msg);
 
-int adp_thr_mgr_get_num_fds(adpoll_thread_mgr_t *this);
+//not supported yet
+//int adp_thr_mgr_get_num_fds(adpoll_thread_mgr_t *this);
 
 /* return value: write pipe fd */
 int adp_thr_mgr_get_pri_pipe_wr(adpoll_thread_mgr_t *this);
+
+/* return value: read pipe fd */
+int adp_thr_mgr_get_pri_pipe_rd(adpoll_thread_mgr_t *this);
 
 /* return value: write pipe fd */
 int adp_thr_mgr_get_data_pipe_wr(adpoll_thread_mgr_t *this);

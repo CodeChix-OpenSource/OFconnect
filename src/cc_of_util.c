@@ -279,7 +279,7 @@ cc_create_rw_pollthr(adpoll_thread_mgr_t **tmgr,
     
     tmgr_new = adp_thr_mgr_new(tname, max_sockets, max_pipes);
 
-    if (tmgr == NULL) {
+    if (tmgr_new == NULL) {
         CC_LOG_ERROR("%s(%d): failed to create new poll thread for rw",
                      __FUNCTION__, __LINE__);
         return CC_OF_EMISC;

@@ -25,10 +25,12 @@ net_svcs_t udp_sockfns = {
 };
 
 
-static void process_udpfd_pollin_func(char *tname UNUSED, void *data UNUSED)
+static void process_udpfd_pollin_func(char *tname UNUSED,
+                                      adpoll_fd_info_t *data_p UNUSED,
+                                      void *unused_data UNUSED)
 {
     /* TODO: Impl this */
-    CC_LOG_ERROR("%s NOT IMPLEMENTED, %s, %p", __FUNCTION__, tname, data);
+    CC_LOG_ERROR("%s NOT IMPLEMENTED, %s, %p", __FUNCTION__, tname, data_p);
 
     /* Allocate buf to read data */     
 
@@ -38,10 +40,12 @@ static void process_udpfd_pollin_func(char *tname UNUSED, void *data UNUSED)
 }
 
 
-static void process_udpfd_pollout_func(char *tname UNUSED, void *data UNUSED)
+static void process_udpfd_pollout_func(char *tname UNUSED,
+                                       adpoll_fd_info_t *data_p UNUSED,
+                                       adpoll_send_msg_htbl_info_t *send_msg_p UNUSED)
 {
     /* TODO: Impl this */
-    CC_LOG_ERROR("%s NOT IMPLEMENTED, %s, %p", __FUNCTION__, tname, data);
+    CC_LOG_ERROR("%s NOT IMPLEMENTED, %s, %p", __FUNCTION__, tname, data_p);
 
     /* Read data from the pipe */
 
@@ -101,9 +105,9 @@ int udp_open_serverfd(cc_ofdev_key_t key)
     thr_msg.fd_action = ADD;
     thr_msg.poll_events = POLLIN|POLLOUT;
     thr_msg.pollin_func = &process_udpfd_pollin_func;
-    thr_msg.pollin_user_data = NULL; 
+//    thr_msg.pollin_user_data = NULL; 
     thr_msg.pollout_func = &process_udpfd_pollout_func;
-    thr_msg.pollout_user_data = NULL;
+//    thr_msg.pollout_user_data = NULL;
 
     cc_add_sockfd_rw_pollthr(&thr_msg, key, UDP);        
 

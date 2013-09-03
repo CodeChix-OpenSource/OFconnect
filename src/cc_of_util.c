@@ -452,6 +452,8 @@ cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key,
     return status;
 }
 
+
+// NOT NEEDED ANYMORE
 /* return: CC_OF_OK on success
  *         actual_len set to the len of pkt to be sent out
  *         actual_len set to 0 when there is no data to be 

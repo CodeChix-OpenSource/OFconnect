@@ -13,6 +13,11 @@
 void
 adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p);
 
+static void
+pollthr_data_pipe_process_func(char *tname,
+                               adpoll_fd_info_t *data_p,
+                               adpoll_send_msg_htbl_info_t *unused_data UNUSED);                               
+
 adpoll_thread_mgr_t *
 adp_thr_mgr_new(char *tname,
                 uint32_t max_sockets,
@@ -88,7 +93,7 @@ adp_thr_mgr_new(char *tname,
     /* pollin_func pulls data from the data pipe
        and stores in a hash table based on rwsocket
     */
-    add_datapipe_msg.pollin_func = NULL;
+    add_datapipe_msg.pollin_func = &pollthr_data_pipe_process_func;
     add_datapipe_msg.pollout_func = NULL;
 
     adp_thr_mgr_add_del_fd(this, &add_datapipe_msg);
@@ -297,12 +302,11 @@ static void
 poll_fd_process(adpoll_fd_info_t *data_p,
                 char *tname)
 {
-    /* Commented unused variables for compilation
     pollthr_private_t *thr_pvt_p = NULL;
-    GList *fd_list;
+    adpoll_send_msg_htbl_key_t send_msg_key;
+    adpoll_send_msg_htbl_info_t *send_msg_info;    
     
     thr_pvt_p = g_private_get(&tname_key);
-    fd_list = thr_pvt_p->fd_list; */
 
     if ((data_p->pollfd_entry_p) &&
         ((data_p->pollfd_entry_p->revents & POLLIN) &
@@ -311,7 +315,7 @@ poll_fd_process(adpoll_fd_info_t *data_p,
         CC_LOG_DEBUG("%s(%d): POLLIN on fd %d",
                      __FUNCTION__, __LINE__, data_p->pollfd_entry_p->fd);
         if (data_p->pollin_func) {
-            data_p->pollin_func(tname, (void *)data_p);
+            data_p->pollin_func(tname, data_p, NULL);
         }
     }
     if ((data_p->pollfd_entry_p) &&
@@ -320,10 +324,34 @@ poll_fd_process(adpoll_fd_info_t *data_p,
     {
         CC_LOG_DEBUG("%s(%d): POLLOUT on fd %d",
                      __FUNCTION__, __LINE__, data_p->pollfd_entry_p->fd);
+        
+        /* lookup hash table entry for this socket fd*/
+        send_msg_key.fd = data_p->fd;
+
+        g_mutex_lock(&thr_pvt_p->send_msg_htbl_lock);
+        
+        send_msg_info = g_hash_table_lookup(thr_pvt_p->send_msg_htbl,
+                                            (gpointer)&send_msg_key);
         if (data_p->pollout_func) {
-            data_p->pollout_func(tname, (void *)data_p);
+            data_p->pollout_func(tname, data_p, send_msg_info);
+        } else {
+            CC_LOG_ERROR("%s(%d): No pollout function defined",
+                         __FUNCTION__, __LINE__);
         }
+
+
+        g_hash_table_remove(thr_pvt_p->send_msg_htbl,
+                            (gpointer)&send_msg_key);
+
+        /* if this is the last of the messages, reset pollout flag */
+        if (g_hash_table_size(thr_pvt_p->send_msg_htbl) == 0) {
+            data_p->pollfd_entry_p->events &= ~POLLOUT;
+        }
+        g_mutex_unlock(&thr_pvt_p->send_msg_htbl_lock);
     }
+    
+    g_private_replace(&tname_key,
+                      (gpointer)thr_pvt_p);
 }
 
 static void
@@ -336,16 +364,15 @@ print_fd_list(adpoll_fd_info_t *data_p)
 
 
 
-/* Function: pollthr_pipe_process_func
+/* Function: pollthr_pri_pipe_process_func
  * Callback function to process a pipe read
  * This function is of type fd_process_func
- * additional user data is in pollin_user_data
  */
 static void
-pollthr_pipe_process_func(char *tname,
-                          void *data)
+pollthr_pri_pipe_process_func(char *tname,
+                              adpoll_fd_info_t *data_p,
+                              adpoll_send_msg_htbl_info_t *unused_data UNUSED)
 {
-    adpoll_fd_info_t *data_p = (adpoll_fd_info_t *)data;
     adpoll_thr_msg_t msg;
     adpoll_fd_info_t *fd_entry_p; /* append this entry to fd_list */
     int i;
@@ -378,15 +405,15 @@ pollthr_pipe_process_func(char *tname,
           fd_entry_p->fd_type = msg.fd_type;
 
           if (msg.fd_type == PIPE) {
-              fd_entry_p->pollin_func = &pollthr_pipe_process_func;
-              fd_entry_p->pollin_user_data = data_p->pollin_user_data;
+              fd_entry_p->pollin_func = &pollthr_pri_pipe_process_func;
+//              fd_entry_p->pollin_user_data = data_p->pollin_user_data;
               fd_entry_p->pollout_func = NULL;
-              fd_entry_p->pollout_user_data = NULL;
+//              fd_entry_p->pollout_user_data = NULL;
           } else {
               fd_entry_p->pollin_func = msg.pollin_func;
-              fd_entry_p->pollin_user_data = msg.pollin_user_data;
+//              fd_entry_p->pollin_user_data = msg.pollin_user_data;
               fd_entry_p->pollout_func = msg.pollout_func;
-              fd_entry_p->pollout_user_data = msg.pollout_user_data;
+//              fd_entry_p->pollout_user_data = msg.pollout_user_data;
           }
 
           CC_LOG_DEBUG("%s(%d)[%s]: poll thr has %d pollfd entries",
@@ -402,6 +429,9 @@ pollthr_pipe_process_func(char *tname,
           /* setup poll fd for primary pipe*/
           pollfd_entry_p->fd = msg.fd;
           pollfd_entry_p->events = msg.poll_events;
+
+          /* remove POLLOUT until message is buffered to send out */
+          pollfd_entry_p->events &= ~(POLLOUT);
 
           fd_entry_p->pollfd_entry_p = pollfd_entry_p;
           
@@ -513,6 +543,68 @@ pollthr_pipe_process_func(char *tname,
     }
 }
 
+static void
+pollthr_data_pipe_process_func(char *tname UNUSED,
+                               adpoll_fd_info_t *data_p,
+                               adpoll_send_msg_htbl_info_t *unused_data UNUSED)
+{
+    char msg_buf[SEND_MSG_BUF_SIZE];
+    adpoll_send_msg_t *msg_p;
+    struct pollfd *pollfd_entry_p;
+    adpoll_send_msg_htbl_key_t *send_msg_key;
+    adpoll_send_msg_htbl_info_t *send_msg_info;
+
+    send_msg_key =
+        (adpoll_send_msg_htbl_key_t *)malloc(sizeof(send_msg_key));
+    send_msg_info = 
+        (adpoll_send_msg_htbl_info_t *)malloc(sizeof(send_msg_info));
+    
+    pollthr_private_t *thr_pvt_p = NULL;    
+    thr_pvt_p = g_private_get(&tname_key);
+    
+    read(data_p->fd, msg_buf, SEND_MSG_BUF_SIZE);
+    msg_p = (adpoll_send_msg_t *)msg_buf;
+    
+    CC_LOG_INFO("%s(%d): message received: size: %u, fd : %d",
+                __FUNCTION__, __LINE__,
+                msg_p->hdr.msg_size, msg_p->hdr.fd);
+
+    send_msg_key->fd = msg_p->hdr.fd;
+    send_msg_info->data_size =
+        msg_p->hdr.msg_size - sizeof(adpoll_send_msg_hdr_t);
+    g_memmove(send_msg_info->data, msg_p->data, send_msg_info->data_size);
+    
+    /* add message to htbl */
+    g_mutex_lock(&thr_pvt_p->send_msg_htbl_lock);
+    g_hash_table_insert(thr_pvt_p->send_msg_htbl,
+                        (gpointer)send_msg_key, 
+                        (gpointer)send_msg_info);
+
+    /* update POLLOUT flag on pollfd entry so it can be sent out */
+    pollfd_entry_p = data_p->pollfd_entry_p;
+    g_assert(pollfd_entry_p != NULL);
+    pollfd_entry_p->events |= POLLOUT;
+
+    g_mutex_unlock(&thr_pvt_p->send_msg_htbl_lock);
+    
+    g_private_replace(&tname_key,
+                      (gpointer)thr_pvt_p);
+}
+
+void func_destroy_key(gpointer data)
+{
+    g_free(data);
+}
+
+void func_destroy_val(gpointer data)
+{
+    adpoll_send_msg_htbl_info_t *send_msg_htbl_info_p;
+    send_msg_htbl_info_p = (adpoll_send_msg_htbl_info_t *)data;
+    
+    g_free(send_msg_htbl_info_p->data);    
+    g_free(data);
+}
+
 
 /*
  * Function: adp_thr_mgr_poll_thread_func
@@ -551,15 +643,20 @@ adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p)
 
     thr_pvt_p->del_pipe_cv_mutex_p = pollthr_data_p->del_pipe_cv_mutex_p;
     thr_pvt_p->del_pipe_cv_cond_p = pollthr_data_p->del_pipe_cv_cond_p;
+    g_mutex_init(&thr_pvt_p->send_msg_htbl_lock);
+    thr_pvt_p->send_msg_htbl = g_hash_table_new_full(g_direct_hash,
+                                                     g_int_equal,
+                                                     func_destroy_key,
+                                                     func_destroy_val);
 
     /* Initialize the first fd entry in fd_list */
     fd_entry_p = (adpoll_fd_info_t *)malloc(sizeof(adpoll_fd_info_t));
     fd_entry_p->fd = pollthr_data_p->primary_pipe_rd_fd;
     fd_entry_p->fd_type = PIPE;
-    fd_entry_p->pollin_func = &pollthr_pipe_process_func;
-    fd_entry_p->pollin_user_data = pollthr_name;
+    fd_entry_p->pollin_func = &pollthr_pri_pipe_process_func;
+//    fd_entry_p->pollin_user_data = pollthr_name;
     fd_entry_p->pollout_func = NULL;
-    fd_entry_p->pollout_user_data = NULL;
+//    fd_entry_p->pollout_user_data = NULL;
         
 
     /* setup poll fd for primary pipe*/
@@ -650,6 +747,8 @@ adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p)
 /*TBD: free everything in the thread */
     free(thr_pvt_p->pollfd_arr);
     g_list_free_full(thr_pvt_p->fd_list, (GDestroyNotify)fd_entry_free);
+    g_mutex_clear(&thr_pvt_p->send_msg_htbl_lock);
+    g_hash_table_destroy(thr_pvt_p->send_msg_htbl);
     free(thr_pvt_p);
 }
 

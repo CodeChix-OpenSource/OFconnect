@@ -98,6 +98,10 @@
 
 #define IS_FD_WR(fd) (fd % 2)
 
+#ifndef UNUSED
+#define UNUSED __attribute__ ((__unused__))
+#endif
+
 /* Thread-priate data for Polling Thread */
 GPrivate tname_key;
 
@@ -110,10 +114,6 @@ typedef enum adpoll_fd_action_ {
     ADD_FD,
     DELETE_FD
 } adpoll_fd_action_e;
-
-/* Callback function for FD poll-in and poll-out */
-typedef void (*fd_process_func)(char *tname,
-                                void *data_p);
 
 /* Global data for async dynamic poll-thread manager */
 typedef struct adpoll_thread_mgr {
@@ -141,6 +141,22 @@ typedef struct adpoll_pollthr_data_ {
     GCond   *adp_thr_init_cv_cond_p;
 } adpoll_pollthr_data_t;
 
+typedef struct adpoll_send_msg_htbl_key_ {
+    int               fd;
+} adpoll_send_msg_htbl_key_t;
+
+typedef struct adpoll_send_msg_htbl_info_ {
+    uint              data_size;
+    char               data[];
+} adpoll_send_msg_htbl_info_t;
+
+typedef struct adpoll_fd_info_ adpoll_fd_info_t;
+
+/* Callback function for FD poll-in and poll-out */
+typedef void (*fd_process_func)(char *tname,
+                                adpoll_fd_info_t *data_p,
+                                adpoll_send_msg_htbl_info_t *send_msg_p);
+
 /* message sent via pipe from thread manager to poll thread */
 typedef struct adpoll_thr_msg_ {
     int                fd;    
@@ -148,19 +164,16 @@ typedef struct adpoll_thr_msg_ {
     adpoll_fd_action_e fd_action;
     short              poll_events; /* poll flags */
     fd_process_func    pollin_func;
-    void               *pollin_user_data;
     fd_process_func    pollout_func;
-    void               *pollout_user_data;
 } adpoll_thr_msg_t;
+
 
 /* thread specific */
 typedef struct adpoll_fd_info_ {
     int                fd;
     adpoll_fd_type_e   fd_type;
     fd_process_func    pollin_func;
-    void               *pollin_user_data;
     fd_process_func    pollout_func;
-    void               *pollout_user_data;
     struct pollfd      *pollfd_entry_p; /*poll syscall uses this info*/
 } adpoll_fd_info_t;
 
@@ -173,6 +186,8 @@ typedef struct adpoll_send_msg_ {
     adpoll_send_msg_hdr_t hdr;
     char                  data[];
 } adpoll_send_msg_t;
+
+
 
 typedef struct pollthr_private_ {
     int           num_pollfds;

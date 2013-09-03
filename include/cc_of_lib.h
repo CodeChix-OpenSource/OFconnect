@@ -6,7 +6,8 @@
 
 #include "cc_net_conn.h"
 
-char SEND_MSG_BUF[1024];
+#define SEND_MSG_BUF_SIZE 1024
+char SEND_MSG_BUF[SEND_MSG_BUF_SIZE];
 
 //error codes
 typedef int cc_of_ret;

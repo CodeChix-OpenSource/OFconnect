@@ -30,9 +30,10 @@ net_svcs_t tcp_sockfns = {
 extern net_svcs_t tcp_sockfns;
 
 
-static void process_listenfd_pollin_func(char *tname UNUSED, void *data) {
-    
-    adpoll_fd_info_t *data_p = (adpoll_fd_info_t *)data;
+static void process_listenfd_pollin_func(char *tname UNUSED,
+                                         adpoll_fd_info_t *data_p,
+                                         adpoll_send_msg_htbl_info_t *unused_data UNUSED)
+{
     int listenfd;    
 
     if (!data_p) {
@@ -62,9 +63,10 @@ static void process_listenfd_pollin_func(char *tname UNUSED, void *data) {
 }
 
 
-static void process_tcpfd_pollin_func(char *tname UNUSED, void *data)
+static void process_tcpfd_pollin_func(char *tname UNUSED,
+                                      adpoll_fd_info_t *data_p,
+                                      adpoll_send_msg_htbl_info_t *unused_data UNUSED)
 {
-    adpoll_fd_info_t *data_p = (adpoll_fd_info_t *)data;
     char buf[MAXBUF]; /* Allocate buf to read data */
     ssize_t read_len = 0;
     cc_ofchannel_key_t *channel_key_tmp;
@@ -138,17 +140,21 @@ static void process_tcpfd_pollin_func(char *tname UNUSED, void *data)
 }
 
 
-static void process_tcpfd_pollout_func(char *tname UNUSED, void *data)
+static void process_tcpfd_pollout_func(char *tname UNUSED,
+                                       adpoll_fd_info_t *data_p,
+                                       adpoll_send_msg_htbl_info_t *send_msg_p)
 {
     cc_of_ret status = CC_OF_OK;
-    adpoll_fd_info_t *data_p = (adpoll_fd_info_t *)data;
-    char buf[MAXBUF];
-    size_t actual_len = 0;
     int tcp_sockfd = 0;
     adpoll_thread_mgr_t *tmgr = NULL;
 
     if (data_p == NULL) {
         CC_LOG_ERROR("%s(%d): received NULL data",
+                     __FUNCTION__, __LINE__);
+    }
+
+    if (send_msg_p == NULL) {
+        CC_LOG_ERROR("%s(%d): send message invalid",
                      __FUNCTION__, __LINE__);
     }
 
@@ -159,25 +165,9 @@ static void process_tcpfd_pollout_func(char *tname UNUSED, void *data)
                      __FUNCTION__, __LINE__, tcp_sockfd);
         return;
     }
-    
-    /* Read pkt that should be sent out on this fd from thr_mgr data pipe */
-    status = cc_read_pkt_pollthr(tmgr, tcp_sockfd, buf, 
-                                  MAXBUF, &actual_len);
-    if (status != CC_OF_OK) {
-        CC_LOG_ERROR("%s(%d): error reading pkt from thrmgr pipe for tcp"
-                     "sockfd: %d",  __FUNCTION__, __LINE__, tcp_sockfd);
-        return;
-    }
-
-    if (actual_len == 0) {
-        CC_LOG_INFO("%s(%d): no data available to send on tcp sockfd %d", 
-                    __FUNCTION__, __LINE__, tcp_sockfd);
-        return;
-
-    }
 
     /* Call tcpsocket send fn */
-    if (tcp_write(tcp_sockfd, buf, actual_len, 0, NULL, 0) < 0) {
+    if (tcp_write(tcp_sockfd, send_msg_p->data, send_msg_p->data_size, 0, NULL, 0) < 0) {
         CC_LOG_ERROR("%s(%d): %s, error while sending pkt on tcp sockfd: %d", 
                      __FUNCTION__, __LINE__, strerror(errno), tcp_sockfd);
         return;
@@ -240,9 +230,9 @@ cc_of_ret tcp_open_clientfd(cc_ofdev_key_t key)
     thr_msg.fd_action = ADD;
     thr_msg.poll_events = POLLIN | POLLOUT;
     thr_msg.pollin_func = &process_tcpfd_pollin_func;
-    thr_msg.pollin_user_data = NULL; // do we need this ??
+//    thr_msg.pollin_user_data = NULL; // do we need this ??
     thr_msg.pollout_func = &process_tcpfd_pollout_func;
-    thr_msg.pollout_user_data = NULL; // do we need this ??
+//    thr_msg.pollout_user_data = NULL; // do we need this ??
         
     status = cc_add_sockfd_rw_pollthr(&thr_msg, key, TCP);
     if (status < 0) {
@@ -298,9 +288,9 @@ cc_of_ret tcp_open_listenfd(cc_ofdev_key_t key)
     thr_msg.fd_action = ADD;
     thr_msg.poll_events = POLLIN;
     thr_msg.pollin_func = &process_listenfd_pollin_func;
-    thr_msg.pollin_user_data = NULL; 
+//    thr_msg.pollin_user_data = NULL; 
     thr_msg.pollout_func = NULL;
-    thr_msg.pollout_user_data = NULL;
+//    thr_msg.pollout_user_data = NULL;
 
     adp_thr_mgr_add_del_fd(cc_of_global.oflisten_pollthr_p, &thr_msg);
 
@@ -329,9 +319,9 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
     thr_msg.fd_action = ADD;
     thr_msg.poll_events = POLLIN | POLLOUT;
     thr_msg.pollin_func = &process_tcpfd_pollin_func;
-    thr_msg.pollin_user_data = NULL; // do we need this ??
+//    thr_msg.pollin_user_data = NULL; // do we need this ??
     thr_msg.pollout_func = &process_tcpfd_pollout_func;
-    thr_msg.pollout_user_data = NULL; // do we need this ??
+//    thr_msg.pollout_user_data = NULL; // do we need this ??
     
     dev_key.controller_ip_addr = key.controller_ip_addr;
     dev_key.switch_ip_addr = ntohl(clientaddr.sin_addr.s_addr);

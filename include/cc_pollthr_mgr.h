@@ -164,12 +164,24 @@ typedef struct adpoll_fd_info_ {
     struct pollfd      *pollfd_entry_p; /*poll syscall uses this info*/
 } adpoll_fd_info_t;
 
+typedef struct adpoll_send_msg_hdr_ {
+    uint               msg_size;
+    int                fd;
+} adpoll_send_msg_hdr_t;
+
+typedef struct adpoll_send_msg_ {
+    adpoll_send_msg_hdr_t hdr;
+    char                  data[];
+} adpoll_send_msg_t;
+
 typedef struct pollthr_private_ {
     int           num_pollfds;
     struct pollfd *pollfd_arr;
     GList         *fd_list;
     GMutex        *del_pipe_cv_mutex_p;
     GCond         *del_pipe_cv_cond_p;
+    GHashTable    *send_msg_htbl;
+    GMutex	  send_msg_htbl_lock;    
 } pollthr_private_t;
 
 adpoll_thread_mgr_t *

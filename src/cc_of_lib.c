@@ -1,6 +1,6 @@
 #include "cc_of_global.h"
 #include "cc_of_priv.h"
-
+#include "string.h"
 
 cc_of_global_t cc_of_global;
 // Does this need a lock for the global struct ? 
@@ -250,6 +250,45 @@ int cc_of_dev_register(ipaddr_v4v6_t controller_ip_addr,
 
     return status;
 }
+
+cc_of_ret
+cc_of_send_pkt(cc_ofchannel_key_t chann_id, void *of_msg, 
+               size_t msg_len)
+{
+    cc_ofchannel_info_t *chann_info;
+    adpoll_thread_mgr_t *tmgr = NULL;
+    int send_rwsock;    
+    adpoll_send_msg_t  *msg_p;
+    msg_p = (adpoll_send_msg_t *)SEND_MSG_BUF;
+
+    if (of_msg == NULL) {
+        CC_LOG_ERROR("%s(%d): message is invalid",
+                     __FUNCTION__, __LINE__);
+        return CC_OF_EINVAL;
+    }
+    g_mutex_lock(&cc_of_global.ofchannel_htbl_lock);
+    chann_info = g_hash_table_lookup(cc_of_global.ofchannel_htbl,
+                                     (gconstpointer)&chann_id);
+    send_rwsock = chann_info->rw_sockfd;
+
+    find_thrmgr_rwsocket(send_rwsock, &tmgr);
+
+    if (tmgr == NULL) {
+        CC_LOG_ERROR("%s(%d): socket %d is invalid",
+                     __FUNCTION__, __LINE__, send_rwsock);
+        return CC_OF_EINVAL;
+    }
+    
+    msg_p->hdr.msg_size = msg_len + sizeof(adpoll_send_msg_hdr_t);
+    msg_p->hdr.fd = send_rwsock;
+    g_memmove(msg_p->data, of_msg, msg_len);
+
+    write(adp_thr_mgr_get_data_pipe_wr(tmgr),
+          msg_p, msg_p->hdr.msg_size);
+    
+    return CC_OF_OK;
+}
+
 
 void
 cc_of_debug_toggle(gboolean debug_on)

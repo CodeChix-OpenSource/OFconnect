@@ -85,6 +85,9 @@ adp_thr_mgr_new(char *tname,
     add_datapipe_msg.fd_type = PIPE;
     add_datapipe_msg.fd_action = ADD_FD;
     add_datapipe_msg.poll_events = POLLIN;
+    /* pollin_func pulls data from the data pipe
+       and stores in a hash table based on rwsocket
+    */
     add_datapipe_msg.pollin_func = NULL;
     add_datapipe_msg.pollout_func = NULL;
 

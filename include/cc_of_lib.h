@@ -4,68 +4,10 @@
 #ifndef CC_OF_LIB_H
 #define CC_OF_LIB_H
 
-#include "cc_net_conn.h"
+#include "cc_of_common.h"
 
 #define SEND_MSG_BUF_SIZE 1024
 char SEND_MSG_BUF[SEND_MSG_BUF_SIZE];
-
-//error codes
-typedef int cc_of_ret;
-#define CC_OF_OK        0
-#define CC_OF_ESYS     -1  /* syscall, library call error */
-#define CC_OF_EINVAL   -2  /* invalid attribute */
-#define CC_OF_EAGAIN   -3  /* retry */
-#define CC_OF_ENOMEM   -4  /* malloc or other mem max */
-#define CC_OF_MDEV     -5  /* max out on dev */
-#define CC_OF_EHTBL    -6  /* hash table failures */
-#define CC_OF_MCHANN   -7  /* max out on channels */
-#define CC_OF_ECHANN   -8  /* unable to establish socket */
-#define CC_OF_EEXIST   -9  /* already exists */
-#define CC_OF_EMISC    -10 /* misc error */
-
-
-static const char * cc_of_errtable[] = {
-    "okay",
-    "syscall/library call failed",
-    "invalid attribute",
-    "retry",
-    "out of memory",
-    "max out on devices",
-    "hash table failures",
-    "max out on channels",
-    "unable to establish sockets",
-    "already exists",
-    "misc error",
-};
-
-inline const char *cc_of_strerror(int errnum);
-
-typedef enum cc_ofver_ {
-    CC_OFVER_1_0   = 0,
-    CC_OFVER_1_3,
-    CC_OFVER_1_3_1
-} cc_ofver_e;
-
-#define CC_OF_ERRTABLE_SIZE (sizeof(cc_of_errtable) / sizeof(cc_of_errtable[0]))
-
-
-/**
- * cc_of_recv_pkt
- *
- * Description:
- * This callback function is called by the library when a packet is received
- * from the socket.
- *
- * Returns:
- * Status
- *
- * Notes:
- * 01. This will be a callback. 
- *
- */
-typedef int (*cc_of_recv_pkt)(cc_ofchannel_key_t chann_id,
-                              void *of_msg, 
-                              size_t of_msg_len);
 
 /**
  * cc_of_lib_init
@@ -87,26 +29,24 @@ typedef int (*cc_of_recv_pkt)(cc_ofchannel_key_t chann_id,
  *     
  */
 int 
-cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type);
+cc_of_lib_init(of_dev_type_e dev_type, 
+               of_drv_type_e drv_type);
 
 int
 cc_of_lib_free(void);
 
-/* Why do we need this? */
-int 
-cc_of_lib_abort(void);
-
-
 int
-cc_of_dev_register(ipaddr_v4v6_t controller_ip_addr,
-                   ipaddr_v4v6_t switch_ip_addr,
+cc_of_dev_register(uint32_t controller_ip,
+                   uint32_t switch_ip,
                    uint16_t controller_L4_port,
                    cc_ofver_e max_ofver,
                    cc_of_recv_pkt recv_func /*func ptr*/);
 /* possible additional fields for TLS certificate */
 
 int
-cc_of_dev_free(cc_ofdev_key_t dev_key);
+cc_of_dev_free(uint32_t controller_ip,
+               uint32_t switch_ip,
+               uint16_t controller_L4_port);
 
 /**
  * cc_of_create_channel
@@ -120,8 +60,11 @@ cc_of_dev_free(cc_ofdev_key_t dev_key);
  *
  */
 int 
-cc_of_create_channel(cc_ofdev_key_t dev_key,
-                     cc_ofchannel_key_t chann_id); /*noop for controller */
+cc_of_create_channel(uint32_t controller_ip,
+                     uint32_t switch_ip,
+                     uint16_t controller_L4_port,
+                     uint64_t dp_id, 
+                     uint8_t aux_id); /*noop for controller */
 /**
  * cc_of_destroy_channel
  *
@@ -136,7 +79,8 @@ cc_of_create_channel(cc_ofdev_key_t dev_key,
  *     connection will be terminated.
  */
 int 
-cc_of_destroy_channel(cc_ofchannel_key_t chann_id); /*noop for controller */
+cc_of_destroy_channel(uint64_t dp_id, 
+                      uint8_t aux_id); /*noop for controller */
 
 
 /**
@@ -149,7 +93,9 @@ cc_of_destroy_channel(cc_ofchannel_key_t chann_id); /*noop for controller */
  * Status
  */
 int
-cc_of_send_pkt(cc_ofchannel_key_t chann_id, void *of_msg, 
+cc_of_send_pkt(uint64_t dp_id, 
+               uint8_t aux_id, 
+               void *of_msg, 
                size_t msg_len);
 
 /**
@@ -163,8 +109,11 @@ cc_of_send_pkt(cc_ofchannel_key_t chann_id, void *of_msg,
  * Status
  */
 int
-cc_of_get_conn_stats(cc_ofchannel_key_t chann_id,
-cc_ofstats_t *stats);
+cc_of_get_conn_stats(uint64_t dp_id, 
+                     uint8_t aux_id,
+                     uint32_t *rx_pkt,
+                     uint32_t *tx_pkt,
+                     uint32_t *tx_drops);
 
 /**
  * cc_of_debug_toggle

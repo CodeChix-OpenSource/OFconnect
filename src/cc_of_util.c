@@ -451,32 +451,3 @@ cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key,
 
     return status;
 }
-
-
-// NOT NEEDED ANYMORE
-/* return: CC_OF_OK on success
- *         actual_len set to the len of pkt to be sent out
- *         actual_len set to 0 when there is no data to be 
- *         sent out on sockfd
- */
-cc_of_ret cc_read_pkt_pollthr(adpoll_thread_mgr_t *this UNUSED, 
-                              int sockfd UNUSED, void *buf UNUSED,
-                              size_t buf_len UNUSED,
-                              size_t *actual_len UNUSED) {
-
-    /* TODO: Implement this */
-    CC_LOG_ERROR("%s NOT IMPLEMENTED", __FUNCTION__);
-    
-    /* Read a pkt from the data pipe of this */
-
-    /* Check if the pkt needs to go out on sockfd */
-
-    /* If not add it to global pkt_buf of this */
-
-    /* Continue reading pkts from data pipe till 
-     * we get the pkt that needs to
-     * go out on sockfd
-     */
-    return CC_OF_OK;
-
-}

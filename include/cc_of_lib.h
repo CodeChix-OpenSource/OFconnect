@@ -92,6 +92,7 @@ cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type);
 int
 cc_of_lib_free(void);
 
+/* Why do we need this? */
 int 
 cc_of_lib_abort(void);
 

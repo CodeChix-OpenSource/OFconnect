@@ -27,7 +27,7 @@ create_logfile(char *logfile);
  * wrapper with locking in cc_of_lib.h
  */
 char *
-read_logfile(char *logfile);
+read_logfile(void);
 
 /* write inside locks */
 void
@@ -45,76 +45,80 @@ write_logfile_lock(char *msg);
 
 #define CC_LOG_WARNING(...)                                             \
     {                                                                   \
-        char lmsg[LOG_MSG_SIZE];                                         \
-        char lmsg_temp[LOG_MSG_SIZE];                                    \
+        char lmsg[LOG_MSG_SIZE];                                        \
+        char lmsg_temp[LOG_MSG_SIZE];                                   \
                                                                         \
         g_log(CC_LOG_DOMAIN, G_LOG_LEVEL_WARNING, __VA_ARGS__);         \
                                                                         \
-        sprintf(lmsg_temp, __VA_ARGS__);                                 \
-        sprintf(lmsg,"%s %d:", CC_LOG_DOMAIN, G_LOG_LEVEL_WARNING);      \
-        strcat(lmsg, lmsg_temp);                                          \
+        sprintf(lmsg_temp, __VA_ARGS__);                                \
+        sprintf(lmsg,"%s %d:", CC_LOG_DOMAIN, G_LOG_LEVEL_WARNING);     \
+        strcat(lmsg, lmsg_temp);                                        \
                                                                         \
-        write_logfile_lock(lmsg);                                        \
+        write_logfile_lock(lmsg);                                       \
     }
-    
 
-#define CC_LOG_DEBUG(...)\
+#define CC_LOG_DEBUG_NOLOG(...)                                         \
     {                                                                   \
-        char lmsg[LOG_MSG_SIZE];                                         \
-        char lmsg_temp[LOG_MSG_SIZE];                                    \
+        g_log(CC_LOG_DOMAIN, G_LOG_LEVEL_DEBUG, __VA_ARGS__);           \
+    }
+
+#define CC_LOG_DEBUG(...)                                               \
+    {                                                                   \
+        char lmsg[LOG_MSG_SIZE];                                        \
+        char lmsg_temp[LOG_MSG_SIZE];                                   \
                                                                         \
         g_log(CC_LOG_DOMAIN, G_LOG_LEVEL_DEBUG, __VA_ARGS__);           \
                                                                         \
-        sprintf(lmsg_temp, __VA_ARGS__);                                 \
-        sprintf(lmsg,"%s %d:", CC_LOG_DOMAIN, G_LOG_LEVEL_DEBUG);        \
-        strcat(lmsg, lmsg_temp);                                          \
+        sprintf(lmsg_temp, __VA_ARGS__);                                \
+        sprintf(lmsg,"%s %d:", CC_LOG_DOMAIN, G_LOG_LEVEL_DEBUG);       \
+        strcat(lmsg, lmsg_temp);                                        \
                                                                         \
-        write_logfile_lock(lmsg);                                        \
+        write_logfile_lock(lmsg);                                       \
     }
 
 
 #define CC_LOG_ERROR(...)                                               \
     {                                                                   \
-        char lmsg[LOG_MSG_SIZE];                                         \
-        char lmsg_temp[LOG_MSG_SIZE];                                    \
+        char lmsg[LOG_MSG_SIZE];                                        \
+        char lmsg_temp[LOG_MSG_SIZE];                                   \
                                                                         \
         g_log(CC_LOG_DOMAIN, G_LOG_LEVEL_CRITICAL, __VA_ARGS__);        \
                                                                         \
-        sprintf(lmsg_temp, __VA_ARGS__);                                 \
-        sprintf(lmsg,"%s %d:", CC_LOG_DOMAIN, G_LOG_LEVEL_CRITICAL);     \
-        strcat(lmsg, lmsg_temp);                                          \
+        sprintf(lmsg_temp, __VA_ARGS__);                                \
+        sprintf(lmsg,"%s %d:", CC_LOG_DOMAIN, G_LOG_LEVEL_CRITICAL);    \
+        strcat(lmsg, lmsg_temp);                                        \
                                                                         \
-        write_logfile_lock(lmsg);                                        \
+        write_logfile_lock(lmsg);                                       \
     }
 
 
 #define CC_LOG_INFO(...)                                                \
     {                                                                   \
-        char lmsg[LOG_MSG_SIZE];                                         \
-        char lmsg_temp[LOG_MSG_SIZE];                                    \
+        char lmsg[LOG_MSG_SIZE];                                        \
+        char lmsg_temp[LOG_MSG_SIZE];                                   \
                                                                         \
         g_log(CC_LOG_DOMAIN, G_LOG_LEVEL_INFO, __VA_ARGS__);            \
                                                                         \
-        sprintf(lmsg_temp, __VA_ARGS__);                                 \
-        sprintf(lmsg,"%s %d:", CC_LOG_DOMAIN, G_LOG_LEVEL_INFO);         \
-        strcat(lmsg, lmsg_temp);                                          \
+        sprintf(lmsg_temp, __VA_ARGS__);                                \
+        sprintf(lmsg,"%s %d:", CC_LOG_DOMAIN, G_LOG_LEVEL_INFO);        \
+        strcat(lmsg, lmsg_temp);                                        \
                                                                         \
-        write_logfile_lock(lmsg);                                        \
+        write_logfile_lock(lmsg);                                       \
     }
 
 
 #define CC_LOG_FATAL(...)                                               \
     {                                                                   \
-        char lmsg[LOG_MSG_SIZE];                                         \
-        char lmsg_temp[LOG_MSG_SIZE];                                    \
+        char lmsg[LOG_MSG_SIZE];                                        \
+        char lmsg_temp[LOG_MSG_SIZE];                                   \
                                                                         \
         g_log(CC_LOG_DOMAIN, G_LOG_LEVEL_ERROR, __VA_ARGS__);           \
                                                                         \
-        sprintf(lmsg_temp, __VA_ARGS__);                                 \
-        sprintf(lmsg,"%s %d:", CC_LOG_DOMAIN, G_LOG_LEVEL_ERROR);        \
-        strcat(lmsg, lmsg_temp);                                          \
+        sprintf(lmsg_temp, __VA_ARGS__);                                \
+        sprintf(lmsg,"%s %d:", CC_LOG_DOMAIN, G_LOG_LEVEL_ERROR);       \
+        strcat(lmsg, lmsg_temp);                                        \
                                                                         \
-        write_logfile_lock(lmsg);                                        \
+        write_logfile_lock(lmsg);                                       \
     }
 
 

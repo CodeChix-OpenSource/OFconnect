@@ -48,7 +48,7 @@ void cc_ofdev_htbl_destroy_val(gpointer data)
     g_mutex_lock(&dev_info_p->ofrw_socket_list_lock);
     g_list_free_full(dev_info_p->ofrw_socket_list,
                      cc_of_destroy_generic);
-    g_mutex_lock(&dev_info_p->ofrw_socket_list_lock);
+    g_mutex_unlock(&dev_info_p->ofrw_socket_list_lock);
     
     g_mutex_clear(&dev_info_p->ofrw_socket_list_lock);
     
@@ -102,6 +102,7 @@ cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type)
     // Initialize cc_of_global
     cc_of_global.ofdebug_enable = FALSE;
     cc_of_global.oflog_enable = FALSE;
+    cc_of_global.ofut_enable = FALSE;
     cc_of_global.oflog_fd = NULL;
     cc_of_global.oflog_file = malloc(sizeof(char) *
                                      LOG_FILE_NAME_SIZE);
@@ -281,7 +282,7 @@ cc_of_log_read()
     char *log_contents = NULL;
     g_mutex_lock(&cc_of_global.oflog_lock);
     if (cc_of_global.oflog_enable) {
-        log_contents = read_logfile(cc_of_global.oflog_file);
+        log_contents = read_logfile();
     }
     g_mutex_unlock(&cc_of_global.oflog_lock);
     return log_contents;
@@ -299,7 +300,14 @@ int
 cc_of_lib_free()
 {
     /* TODO: INCOMPLETE */
+    /* clear all globally allocated data */
     g_free(cc_of_global.oflog_file);
-    g_free(cc_of_global.oflog_fd);
+    fclose(cc_of_global.oflog_fd);
+    /*
+    g_mutex_clear(ofdev_htbl_lock;
+                  ofchannel_htbl_lock;
+                  ofrw_htbl_lock;
+                  oflog_lock;
+    */
     return CC_OF_OK;
 }

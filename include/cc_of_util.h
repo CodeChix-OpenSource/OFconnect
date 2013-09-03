@@ -88,11 +88,4 @@ cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *msg,
                          cc_ofdev_key_t key, 
                          L4_type_e layer4_proto);
 
-cc_of_ret 
-cc_read_pkt_pollthr(adpoll_thread_mgr_t *this, 
-                    int sockfd, 
-                    void *buf,
-                    size_t buf_len,
-                    size_t *actual_len);
-
 #endif //CC_OF_UTIL_H

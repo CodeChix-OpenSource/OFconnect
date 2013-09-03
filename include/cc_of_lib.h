@@ -6,6 +6,9 @@
 
 #include "cc_net_conn.h"
 
+#define SEND_MSG_BUF_SIZE 1024
+char SEND_MSG_BUF[SEND_MSG_BUF_SIZE];
+
 //error codes
 typedef int cc_of_ret;
 #define CC_OF_OK        0
@@ -146,7 +149,7 @@ cc_of_destroy_channel(cc_ofchannel_key_t chann_id); /*noop for controller */
  */
 int
 cc_of_send_pkt(cc_ofchannel_key_t chann_id, void *of_msg, 
-                   size_t msg_len);
+               size_t msg_len);
 
 /**
  * cc_of_get_conn_stats

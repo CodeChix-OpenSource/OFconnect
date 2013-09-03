@@ -3,6 +3,11 @@
 /*-----------------------------------------------------------------------------*/
 #include "cc_pollthr_mgr.h"
 #include "cc_log.h"
+#include "cc_of_global.h"
+
+#define FD_LIST_COUNT_LOG "%s(%d)[%s]: fd_list has %d entries "
+#define POLLFD_COUNT_LOG "%s(%d)[%s]: num pollfds is %d "
+#define PIPEFD_CREATE_LOG "%s(%d): pipe fds created [rd][wr]: [%d][%d] "
 
 /* Forward Declarations */
 void
@@ -34,8 +39,14 @@ adp_thr_mgr_new(char *tname,
     this->max_sockets = max_sockets;
     this->max_pipes = max_pipes + 4; /* 4 additional for internal use */
     this->num_pipes = 0;
+    this->num_sockets = 0;
 
     this->pipes_arr = (int *)malloc(sizeof(int) * 2 * this->max_pipes);
+
+    g_mutex_init(&this->del_pipe_cv_mutex);
+    g_cond_init(&this->del_pipe_cv_cond);
+    g_mutex_init(&this->adp_thr_init_cv_mutex);
+    g_cond_init(&this->adp_thr_init_cv_cond);
 
     /* create pipe - read is in location 0 and write in 1 */
     if (pipe(this->pipes_arr) == -1) {
@@ -44,9 +55,10 @@ adp_thr_mgr_new(char *tname,
     }
     this->num_pipes += 2; /* pipe creates 2 fds */
 
-    CC_LOG_DEBUG("%s(%d): pipe fds created: [%d][%d]",
+    CC_LOG_DEBUG(PIPEFD_CREATE_LOG "PRIMARY",
                  __FUNCTION__, __LINE__,
-                 this->pipes_arr[0], this->pipes_arr[1]);
+                 this->pipes_arr[PRI_PIPE_RD_FD],
+                 this->pipes_arr[PRI_PIPE_WR_FD]);
 
     strncpy(thread_user_data->tname, this->tname, tname_len);
     thread_user_data->max_pollfds = max_sockets + this->max_pipes;
@@ -64,6 +76,7 @@ adp_thr_mgr_new(char *tname,
 
     /* synchronize with thr_mgr_poll_thread_func */
     g_mutex_lock(&this->adp_thr_init_cv_mutex);
+    
     g_cond_wait(&this->adp_thr_init_cv_cond,
                 &this->adp_thr_init_cv_mutex);
     g_mutex_unlock(&this->adp_thr_init_cv_mutex);
@@ -83,6 +96,7 @@ adp_thr_mgr_new(char *tname,
     return this;
 }
 
+/* NOTE: application needs to clear the this pointer */
 void adp_thr_mgr_free(adpoll_thread_mgr_t *this)
 {
     int i;
@@ -105,8 +119,12 @@ void adp_thr_mgr_free(adpoll_thread_mgr_t *this)
     }
     
     free(this->pipes_arr);
-//    free(this); - application needs to free the mgr pointer
 
+    g_cond_clear(&this->adp_thr_init_cv_cond);
+    g_mutex_clear(&this->adp_thr_init_cv_mutex);
+    
+    g_cond_clear(&this->del_pipe_cv_cond);    
+    g_mutex_clear(&this->del_pipe_cv_mutex);    
 }
 
 /* Function: adp_thr_mgr_add_del_fd
@@ -141,7 +159,7 @@ adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
                              __FUNCTION__, __LINE__);
                 return retval;
             }
-            CC_LOG_DEBUG("%s(%d): new pipes created. rd: %d  wr: %d",
+            CC_LOG_DEBUG(PIPEFD_CREATE_LOG "ADD-ON",
                          __FUNCTION__, __LINE__,
                          this->pipes_arr[this->num_pipes],
                          this->pipes_arr[this->num_pipes + 1]);
@@ -385,6 +403,12 @@ pollthr_pipe_process_func(char *tname,
           fd_entry_p->pollfd_entry_p = pollfd_entry_p;
           
           thr_pvt_p->fd_list = g_list_append(thr_pvt_p->fd_list, fd_entry_p);
+
+          if(cc_of_global.ofut_enable) {
+              CC_LOG_DEBUG(FD_LIST_COUNT_LOG "ADD_FD", __FUNCTION__, __LINE__,
+                           tname, g_list_length(thr_pvt_p->fd_list));
+          }
+          
           g_private_replace(&tname_key,
                             (gpointer)thr_pvt_p);
           break;
@@ -456,6 +480,10 @@ pollthr_pipe_process_func(char *tname,
                       CC_LOG_ERROR("%s(%d)[%s]: inconsistent database "
                                    "- pollfd found but fd entry not in list",
                                    __FUNCTION__, __LINE__, tname);
+                  }
+                  if(cc_of_global.ofut_enable) {
+                      CC_LOG_DEBUG(FD_LIST_COUNT_LOG "DELETE_FD", __FUNCTION__, __LINE__,
+                                   tname, g_list_length(thr_pvt_p->fd_list));
                   }
                   
                   g_private_replace(&tname_key,
@@ -539,7 +567,11 @@ adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p)
     fd_entry_p->pollfd_entry_p = &(thr_pvt_p->pollfd_arr[0]);
     thr_pvt_p->fd_list = g_list_append(thr_pvt_p->fd_list, fd_entry_p);
 
-
+    if(cc_of_global.ofut_enable) {
+        CC_LOG_DEBUG(FD_LIST_COUNT_LOG "SETUP PRI PIPE",
+                     __FUNCTION__, __LINE__, pollthr_name,
+                     g_list_length(thr_pvt_p->fd_list));
+    }
     g_private_set(&tname_key,
                   (gpointer)thr_pvt_p);
 
@@ -621,6 +653,8 @@ adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p)
 uint32_t
 adp_thr_mgr_get_num_avail_sockfd(adpoll_thread_mgr_t *this)
 {
+    CC_LOG_DEBUG("max sockets is %d", this->max_sockets);
+    CC_LOG_DEBUG("num sockets is %d", this->num_sockets);
     return (this->max_sockets - this->num_sockets);
 }
 
@@ -631,6 +665,12 @@ adp_thr_mgr_get_pri_pipe_wr(adpoll_thread_mgr_t *this)
     return(this->pipes_arr[PRI_PIPE_WR_FD]);
 }
 
+/* return value: read pipe fd */
+int
+adp_thr_mgr_get_pri_pipe_rd(adpoll_thread_mgr_t *this)
+{
+    return(this->pipes_arr[PRI_PIPE_RD_FD]);
+}
 
 /* return value: write pipe fd */
 int

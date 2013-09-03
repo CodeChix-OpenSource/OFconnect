@@ -43,9 +43,10 @@ typedef struct cc_of_global_ {
     /* debugs and log file */
     FILE             *oflog_fd;
     char             *oflog_file;
-    gboolean         ofdebug_enable;
-    gboolean         oflog_enable;
+    gboolean         ofdebug_enable; /* enable debugging */
+    gboolean         oflog_enable; /* enable logging to file */
     GMutex           oflog_lock;
+    gboolean         ofut_enable; /* extra debugging to support ut */
 } cc_of_global_t;
 
 extern cc_of_global_t cc_of_global;

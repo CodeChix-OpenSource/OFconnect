@@ -15,7 +15,6 @@ extern cc_of_global_t cc_of_global;
 
 /* Fixture data */
 typedef struct test_data_ {
-//    gconstpointer       tp;
     adpoll_thread_mgr_t tp_data;    
     char                liblog[LIBLOG_SIZE];
 } test_data_t;
@@ -37,7 +36,7 @@ pollthread_start(test_data_t *tdata,
     cc_of_global.oflog_file = malloc(sizeof(char) *
                                      LOG_FILE_NAME_SIZE);
     g_mutex_init(&cc_of_global.oflog_lock);
-    cc_of_debug_toggle(TRUE);    //enable if debugging test code
+//    cc_of_debug_toggle(TRUE);    //enable if debugging test code
     cc_of_log_toggle(TRUE);
     cc_of_global.ofut_enable = TRUE;
     
@@ -50,7 +49,6 @@ pollthread_start(test_data_t *tdata,
     */
     // bad idea - save the pointer to mgr instead
     g_memmove(&tdata->tp_data, temp_mgr_p, sizeof(adpoll_thread_mgr_t));
-//    tdata->tp = temp_mgr_p;
 
     g_test_message("add del mutex %p cv %p", tdata->tp_data.add_del_pipe_cv_mutex,
                    tdata->tp_data.add_del_pipe_cv_cond);                   
@@ -134,9 +132,9 @@ pollthread_tc_1(test_data_t *tdata,
         g_assert_cmpint(adp_thr_mgr_get_num_avail_sockfd(&tdata->tp_data),
                         ==, 10);
 
-//        g_test_message("test - output of log follows");
-//        g_test_message("%s",tdata->liblog);
-//        g_test_message("test - output of log ends");
+        g_test_message("test - output of log follows");
+        g_test_message("%s",tdata->liblog);
+        g_test_message("test - output of log ends");
 
         g_test_message("test - num fd_entry_p in fd_list is 1");
         regex_one_compint(
@@ -147,13 +145,13 @@ pollthread_tc_1(test_data_t *tdata,
         g_test_message("test - value of primary pipe read fd");
         regex_one_compint(
             tdata->liblog,
-            "pipe fds created.*([0-9])..([0-9]). PRIMARY",
+            "pipe fds created.*([0-9])..([0-9])..PRIMARY",
             1, adp_thr_mgr_get_pri_pipe_rd(&tdata->tp_data));
         
         g_test_message("test - value of primary pipe write fd");
         regex_one_compint(
             tdata->liblog,
-            "pipe fds created.*([0-9])..([0-9]). PRIMARY",
+            "pipe fds created.*([0-9])..([0-9])..PRIMARY",
             2, adp_thr_mgr_get_pri_pipe_wr(&tdata->tp_data));
         
 
@@ -166,13 +164,13 @@ pollthread_tc_1(test_data_t *tdata,
         g_test_message("test - value of data pipe read fd");
         regex_one_compint(
             tdata->liblog,
-            "pipe fds created.*([0-9]).*([0-9]).*ADD-ON",
+            "pipe fds created.*([0-9])..([0-9])..ADD-ON",
             1, adp_thr_mgr_get_data_pipe_rd(&tdata->tp_data));
 
         g_test_message("test - value of data pipe write fd");
         regex_one_compint(
             tdata->liblog,
-            "pipe fds created.*([0-9]).*([0-9]).*ADD-ON",
+            "pipe fds created.*([0-9])..([0-9])..ADD-ON",
             2, adp_thr_mgr_get_data_pipe_wr(&tdata->tp_data));
 
 

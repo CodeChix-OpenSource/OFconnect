@@ -62,6 +62,7 @@ write_logfile_lock(char *msg);
         g_log(CC_LOG_DOMAIN, G_LOG_LEVEL_DEBUG, __VA_ARGS__);           \
     }
 
+//        fflush(stdout);                                               
 #define CC_LOG_DEBUG(...)                                               \
     {                                                                   \
         char lmsg[LOG_MSG_SIZE];                                        \

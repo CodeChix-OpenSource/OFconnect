@@ -4,6 +4,7 @@
 #include "cc_pollthr_mgr.h"
 #include "cc_log.h"
 #include "cc_of_global.h"
+#include "errno.h"
 
 #define FD_LIST_COUNT_LOG "%s(%d)[%s]: fd_list has %d entries "
 #define POLLFD_COUNT_LOG "%s(%d)[%s]: num pollfds is %d "
@@ -30,6 +31,11 @@ adp_thr_mgr_new(char *tname,
     adpoll_thr_msg_t add_datapipe_msg;
 
     this = (adpoll_thread_mgr_t *)malloc(sizeof(adpoll_thread_mgr_t));
+
+    this->add_del_pipe_cv_mutex = g_mutex_new();
+    this->add_del_pipe_cv_cond = g_cond_new();
+    this->adp_thr_init_cv_mutex = g_mutex_new();
+    this->adp_thr_init_cv_cond = g_cond_new();
     
     thread_user_data = (adpoll_pollthr_data_t *)
         malloc(sizeof(adpoll_pollthr_data_t));
@@ -42,16 +48,16 @@ adp_thr_mgr_new(char *tname,
     tname_len = i + 1;
     
     this->max_sockets = max_sockets;
-    this->max_pipes = max_pipes + 4; /* 4 additional for internal use */
+    this->max_pipes = max_pipes*2 + 4; /* 2fds per pipe; 4fds additional for internal use */
     this->num_pipes = 0;
     this->num_sockets = 0;
 
     this->pipes_arr = (int *)malloc(sizeof(int) * 2 * this->max_pipes);
 
-    g_mutex_init(&this->del_pipe_cv_mutex);
-    g_cond_init(&this->del_pipe_cv_cond);
-    g_mutex_init(&this->adp_thr_init_cv_mutex);
-    g_cond_init(&this->adp_thr_init_cv_cond);
+    g_mutex_init(this->add_del_pipe_cv_mutex);
+    g_cond_init(this->add_del_pipe_cv_cond);
+    g_mutex_init(this->adp_thr_init_cv_mutex);
+    g_cond_init(this->adp_thr_init_cv_cond);
 
     /* create pipe - read is in location 0 and write in 1 */
     if (pipe(this->pipes_arr) == -1) {
@@ -68,23 +74,19 @@ adp_thr_mgr_new(char *tname,
     strncpy(thread_user_data->tname, this->tname, tname_len);
     thread_user_data->max_pollfds = max_sockets + this->max_pipes;
     thread_user_data->primary_pipe_rd_fd = this->pipes_arr[PRI_PIPE_RD_FD];
-    thread_user_data->del_pipe_cv_mutex_p = &(this->del_pipe_cv_mutex);
-    thread_user_data->del_pipe_cv_cond_p = &(this->del_pipe_cv_cond);
-    thread_user_data->adp_thr_init_cv_mutex_p =
-        &(this->adp_thr_init_cv_mutex);
-    thread_user_data->adp_thr_init_cv_cond_p =
-        &(this->adp_thr_init_cv_cond);
 
+    thread_user_data->mgr = this;
+    
     this->thread_p = g_thread_new(this->tname,
                             (GThreadFunc) adp_thr_mgr_poll_thread_func,
                             thread_user_data);
 
     /* synchronize with thr_mgr_poll_thread_func */
-    g_mutex_lock(&this->adp_thr_init_cv_mutex);
+    g_mutex_lock(this->adp_thr_init_cv_mutex);
     
-    g_cond_wait(&this->adp_thr_init_cv_cond,
-                &this->adp_thr_init_cv_mutex);
-    g_mutex_unlock(&this->adp_thr_init_cv_mutex);
+    g_cond_wait(this->adp_thr_init_cv_cond,
+                this->adp_thr_init_cv_mutex);
+    g_mutex_unlock(this->adp_thr_init_cv_mutex);
 
     
     add_datapipe_msg.fd_type = PIPE;
@@ -96,6 +98,9 @@ adp_thr_mgr_new(char *tname,
     add_datapipe_msg.pollin_func = &pollthr_data_pipe_process_func;
     add_datapipe_msg.pollout_func = NULL;
 
+    CC_LOG_DEBUG("%s(%d): this %p num_pipes is %d",
+                 __FUNCTION__, __LINE__,
+                 this, this->num_pipes);
     adp_thr_mgr_add_del_fd(this, &add_datapipe_msg);
     CC_LOG_DEBUG("%s(%d): new pipe added for data %d",
                  __FUNCTION__, __LINE__,
@@ -128,11 +133,11 @@ void adp_thr_mgr_free(adpoll_thread_mgr_t *this)
     
     free(this->pipes_arr);
 
-    g_cond_clear(&this->adp_thr_init_cv_cond);
-    g_mutex_clear(&this->adp_thr_init_cv_mutex);
+    g_cond_clear(this->adp_thr_init_cv_cond);
+    g_mutex_clear(this->adp_thr_init_cv_mutex);
     
-    g_cond_clear(&this->del_pipe_cv_cond);    
-    g_mutex_clear(&this->del_pipe_cv_mutex);    
+    g_cond_clear(this->add_del_pipe_cv_cond);
+    g_mutex_clear(this->add_del_pipe_cv_mutex);    
 }
 
 /* Function: adp_thr_mgr_add_del_fd
@@ -141,48 +146,59 @@ void adp_thr_mgr_free(adpoll_thread_mgr_t *this)
  * return value: ADD_FD - the newly created wr pipe is returned
  *             : DELETE_FD - returns -1.
  * TODO (IMPORTANT): synchrnize this fn
- * return val??
  */
 int
 adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
                        adpoll_thr_msg_t    *msg)
 {
     int i, j, retval = -1;
-    CC_LOG_DEBUG("%s(%d)", __FUNCTION__, __LINE__);
+    gboolean self_destruct = FALSE;
+    int del_rd_fd_index;
+    uint num_pipes;
+    num_pipes = this->num_pipes;
+    CC_LOG_DEBUG("%s(%d) this is %p numpipes is %d", __FUNCTION__, __LINE__, this, this->num_pipes);
+
     if (msg->fd_type == PIPE) {
+        CC_LOG_DEBUG("%s(%d) this is %p numpipes is %d/%d", __FUNCTION__, __LINE__, this, this->num_pipes, num_pipes);
         if (msg->fd_action == ADD_FD) {
             CC_LOG_DEBUG("%s(%d) pipe ADD", __FUNCTION__,
                          __LINE__);
-            CC_LOG_DEBUG("%s(%d) this->num_pipes is %d",
-                         __FUNCTION__, __LINE__, this->num_pipes);
+            CC_LOG_DEBUG("%s(%d) this is %p numpipes is %d/%d", __FUNCTION__, __LINE__, this, this->num_pipes, num_pipes);
 
-            if (this->num_pipes == this->max_pipes) {
+            if (num_pipes >= this->max_pipes) {
                 CC_LOG_ERROR("%s(%d) unable to add more pipes - max out",
                              __FUNCTION__, __LINE__);
                 return retval;
             }
-            int new_rd_fd_index = this->num_pipes + RD_OFFSET;
-            if (pipe(&this->pipes_arr[this->num_pipes]) == -1) {
-                CC_LOG_FATAL("%s(%d): pipe creation failed",
-                             __FUNCTION__, __LINE__);
+            int new_rd_fd_index = num_pipes + RD_OFFSET;
+
+            CC_LOG_DEBUG("this->pipes_arr[num_pipes] %p",
+                         &this->pipes_arr[num_pipes]);
+            
+            if (pipe(&this->pipes_arr[num_pipes]) == -1) {
+                CC_LOG_FATAL("%s(%d): pipe creation failed error %s",
+                             __FUNCTION__, __LINE__, g_strerror(errno));
                 return retval;
             }
             CC_LOG_DEBUG(PIPEFD_CREATE_LOG "ADD-ON",
                          __FUNCTION__, __LINE__,
-                         this->pipes_arr[this->num_pipes],
-                         this->pipes_arr[this->num_pipes + 1]);
-            this->num_pipes += 2; /* pipe creates 2 fds */
+                         this->pipes_arr[num_pipes],
+                         this->pipes_arr[num_pipes + 1]);
+
+            num_pipes += 2;
+            this->num_pipes = num_pipes; /* pipe creates 2 fds */
 
             msg->fd = this->pipes_arr[new_rd_fd_index];
-            
+
+            g_mutex_lock(this->add_del_pipe_cv_mutex);
             write(this->pipes_arr[PRI_PIPE_WR_FD],
                   msg, sizeof(adpoll_thr_msg_t));
 
-            retval = this->pipes_arr[this->num_pipes - 2 + WR_OFFSET];
+            retval = this->pipes_arr[num_pipes - 2 + WR_OFFSET];
             
         } else if (msg->fd_action == DELETE_FD) {
             /* find this fd in pipes_arr */
-            int del_rd_fd_index;
+
             
             CC_LOG_DEBUG("%s(%d):pipe %d DELETE", __FUNCTION__, __LINE__,
                          msg->fd);
@@ -196,16 +212,15 @@ adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
                              __FUNCTION__, __LINE__,
                              this->pipes_arr[PRI_PIPE_WR_FD]);
 
+                g_mutex_lock(this->add_del_pipe_cv_mutex);
                 write(this->pipes_arr[PRI_PIPE_WR_FD],
                           msg, sizeof(adpoll_thr_msg_t));
 
-                /* TBD: cleanup adp_thr_mgr_free?*/
-                return retval;
-            }
+                self_destruct = TRUE;
 
-            if ((msg->fd == this->pipes_arr[DATA_PIPE_RD_FD]) ||
-                (msg->fd == this->pipes_arr[DATA_PIPE_WR_FD])) {
-
+            } else if ((msg->fd == this->pipes_arr[DATA_PIPE_RD_FD]) ||
+                       (msg->fd == this->pipes_arr[DATA_PIPE_WR_FD])) {
+                    
                 /* Update the message to send to poll thr */
                 msg->fd = this->pipes_arr[DATA_PIPE_RD_FD];
                 
@@ -213,54 +228,42 @@ adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
                              __FUNCTION__, __LINE__,
                              this->pipes_arr[DATA_PIPE_WR_FD]);
 
+                g_mutex_lock((this->add_del_pipe_cv_mutex));
                 write(this->pipes_arr[PRI_PIPE_WR_FD],
                           msg, sizeof(adpoll_thr_msg_t));
 
-                /* TBD: cleanup */
-                return retval;
-            }
-            
-            for (i = 0; i < this->num_pipes; i++) {
-                if (this->pipes_arr[i] == msg->fd) {
-                    del_rd_fd_index = i;
-                    if (IS_FD_WR(del_rd_fd_index)) {
-                        del_rd_fd_index -= WR_OFFSET;
-                    } else {
-                        del_rd_fd_index -= RD_OFFSET;
-                    }
-
-                    CC_LOG_DEBUG("%s(%d): found the fd %d in pipes_arr",
-                                 __FUNCTION__, __LINE__, this->pipes_arr[i]);
-
-                    /* Update the message to send to poll thr */
-                    msg->fd = this->pipes_arr[del_rd_fd_index];
-
-                    /* process error return */
-                    CC_LOG_DEBUG("%s(%d): sending fd DEL to poll thr on fd %d",
-                                 __FUNCTION__, __LINE__,
-                                 this->pipes_arr[PRI_PIPE_WR_FD]);
-                    
+                self_destruct = TRUE;                
+            } else {
+                
+                for (i = 0; i < this->num_pipes; i++) {
+                    if (this->pipes_arr[i] == msg->fd) {
+                        del_rd_fd_index = i;
+                        if (IS_FD_WR(del_rd_fd_index)) {
+                            del_rd_fd_index -= WR_OFFSET;
+                        } else {
+                            del_rd_fd_index -= RD_OFFSET;
+                        }
+                        
+                        CC_LOG_DEBUG("%s(%d): found the fd %d in pipes_arr",
+                                     __FUNCTION__, __LINE__, this->pipes_arr[i]);
+                        
+                        /* Update the message to send to poll thr */
+                        msg->fd = this->pipes_arr[del_rd_fd_index];
+                        
+                        /* process error return */
+                        CC_LOG_DEBUG("%s(%d): sending fd DEL to poll thr on fd %d",
+                                     __FUNCTION__, __LINE__,
+                                     this->pipes_arr[PRI_PIPE_WR_FD]);
+                        
 //                    write(this->pipes_arr[del_rd_fd_index + WR_OFFSET],
 //                          msg, sizeof(adpoll_thr_msg_t));
-
-                    write(this->pipes_arr[PRI_PIPE_WR_FD],
-                          msg, sizeof(adpoll_thr_msg_t));
-                    
-                    //cond wait for thread to delete the fds
-                    g_mutex_lock(&this->del_pipe_cv_mutex);
-                    g_cond_wait(&this->del_pipe_cv_cond,
-                                &this->del_pipe_cv_mutex);
-                    g_mutex_unlock(&this->del_pipe_cv_mutex);
-                    
-                    close(this->pipes_arr[del_rd_fd_index]);
-                    close(this->pipes_arr[del_rd_fd_index + WR_OFFSET]);
-                          
-                    for (j = del_rd_fd_index + 2; j < this->num_pipes; j++) {
-                        this->pipes_arr[j-2] = this->pipes_arr[j];
+                        
+                        g_mutex_lock((this->add_del_pipe_cv_mutex));
+                        write(this->pipes_arr[PRI_PIPE_WR_FD],
+                              msg, sizeof(adpoll_thr_msg_t));
+                        
+                        break;
                     }
-
-                    this->num_pipes -= 2;
-                    break;
                 }
             }
         }
@@ -274,10 +277,10 @@ adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
                              "max out", __FUNCTION__, __LINE__);
                 return retval;
             }
-            (this->num_sockets)++;
+            this->num_sockets += 1;;
             write(this->pipes_arr[PRI_PIPE_WR_FD],
                   msg, sizeof(adpoll_thr_msg_t));
-            
+
             retval = msg->fd;
 
         } else if (msg->fd_action == DELETE_FD) {
@@ -285,7 +288,41 @@ adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
                          __FUNCTION__, __LINE__, msg->fd);
             write(this->pipes_arr[PRI_PIPE_WR_FD],
                   msg, sizeof(adpoll_thr_msg_t));
-            (this->num_sockets)--;            
+        }
+    }
+
+    CC_LOG_DEBUG("_______________waiting mgr %p mutex %p__________",
+                 this, (this->add_del_pipe_cv_mutex));
+
+//    CC_LOG_DEBUG("this has %d max pipes, %d num pipes, with name %s",
+//                 this->max_pipes, this->num_pipes, this->tname);
+//    g_mutex_lock(&(this->add_del_pipe_cv_mutex));
+    CC_LOG_DEBUG("_______________got waiting lock cv %p__________",
+                 (this->add_del_pipe_cv_cond));
+    
+    g_cond_wait((this->add_del_pipe_cv_cond),
+                (this->add_del_pipe_cv_mutex));
+    CC_LOG_DEBUG("_______________end waiting__________");    
+    g_mutex_unlock((this->add_del_pipe_cv_mutex));
+    CC_LOG_DEBUG("_______________release waiting lock %p__________", (this->add_del_pipe_cv_mutex));
+
+    if (self_destruct) {
+//        adp_thr_mgr_free(this); < DO NOT CALL THIS - causes deadlock as it triggers antoher self destruct
+        return retval;
+    }
+
+    if (msg->fd_action == DELETE_FD) {
+        if (msg->fd_type == PIPE) {
+            close(this->pipes_arr[del_rd_fd_index]);
+            close(this->pipes_arr[del_rd_fd_index + WR_OFFSET]);
+            
+            for (j = del_rd_fd_index + 2; j < this->num_pipes; j++) {
+                this->pipes_arr[j-2] = this->pipes_arr[j];
+            }
+            
+            this->num_pipes -= 2;
+        } else {
+            (this->num_sockets)--;
         }
     }
     return retval;
@@ -315,6 +352,7 @@ poll_fd_process(adpoll_fd_info_t *data_p,
         CC_LOG_DEBUG("%s(%d): POLLIN on fd %d",
                      __FUNCTION__, __LINE__, data_p->pollfd_entry_p->fd);
         if (data_p->pollin_func) {
+            CC_LOG_DEBUG("calling pollin function %p", data_p->pollin_func);
             data_p->pollin_func(tname, data_p, NULL);
         }
     }
@@ -378,11 +416,13 @@ pollthr_pri_pipe_process_func(char *tname,
     int i;
     struct pollfd *pollfd_entry_p;
     GList *traverse = NULL;
+//    adpoll_thread_mgr_t *mgr = NULL;
     
     pollthr_private_t *thr_pvt_p = NULL;
     
     thr_pvt_p = g_private_get(&tname_key);
-    
+//    mgr = *(thr_pvt_p->mgr);
+
     read(data_p->fd, &msg, sizeof(adpoll_thr_msg_t));
         
     CC_LOG_INFO("%s(%d): message received: fd type: %d,"
@@ -404,28 +444,24 @@ pollthr_pri_pipe_process_func(char *tname,
           fd_entry_p->fd = msg.fd;
           fd_entry_p->fd_type = msg.fd_type;
 
-          if (msg.fd_type == PIPE) {
-              fd_entry_p->pollin_func = &pollthr_pri_pipe_process_func;
-//              fd_entry_p->pollin_user_data = data_p->pollin_user_data;
-              fd_entry_p->pollout_func = NULL;
-//              fd_entry_p->pollout_user_data = NULL;
-          } else {
+//          if (msg.fd_type == PIPE) {
+//              fd_entry_p->pollin_func = &pollthr_pri_pipe_process_func;
+//              fd_entry_p->pollout_func = NULL;
+//          } else {
               fd_entry_p->pollin_func = msg.pollin_func;
-//              fd_entry_p->pollin_user_data = msg.pollin_user_data;
               fd_entry_p->pollout_func = msg.pollout_func;
-//              fd_entry_p->pollout_user_data = msg.pollout_user_data;
-          }
+//          }
 
-          CC_LOG_DEBUG("%s(%d)[%s]: poll thr has %d pollfd entries",
-                       __FUNCTION__, __LINE__, tname,
-                       thr_pvt_p->num_pollfds);
-          
           /* access and modify the polling thread's pollfd array */
           /* add a corresponding pollfd entry */
           pollfd_entry_p = &(thr_pvt_p->pollfd_arr[thr_pvt_p->num_pollfds]);
 
           thr_pvt_p->num_pollfds += 1;
 
+          CC_LOG_DEBUG(POLLFD_COUNT_LOG "after ADD_FD",
+                       __FUNCTION__, __LINE__, tname,
+                       thr_pvt_p->num_pollfds);
+          
           /* setup poll fd for primary pipe*/
           pollfd_entry_p->fd = msg.fd;
           pollfd_entry_p->events = msg.poll_events;
@@ -442,11 +478,8 @@ pollthr_pri_pipe_process_func(char *tname,
                            tname, g_list_length(thr_pvt_p->fd_list));
           }
           
-          g_private_replace(&tname_key,
-                            (gpointer)thr_pvt_p);
-          break;
-          
       }
+      break;      
       case DELETE_FD:
       {
           gboolean found = FALSE;
@@ -461,86 +494,100 @@ pollthr_pri_pipe_process_func(char *tname,
                                __FUNCTION__, __LINE__);
 
                   thr_pvt_p->num_pollfds = 0;
+                  
                   g_private_replace(&tname_key,
                                     (gpointer)thr_pvt_p);
                   return;
-              }
+              } else {
                   
-              /* find and delete the pollfd entry */              
-              for (i = 1; i < thr_pvt_p->num_pollfds; i++) {
-                  CC_LOG_DEBUG("%s(%d): thr_pvt pollfd iter %d is %d",
+                  /* find and delete the pollfd entry */              
+                  for (i = 1; i < thr_pvt_p->num_pollfds; i++) {
+                      CC_LOG_DEBUG("%s(%d): thr_pvt pollfd iter %d is %d",
                                __FUNCTION__, __LINE__, i,
-                               thr_pvt_p->pollfd_arr[i].fd);
-                  if (msg.fd == thr_pvt_p->pollfd_arr[i].fd) {
-                      del_index = i;
-                      found = TRUE;
-                      break;
-                  }
-              }
-              if (found == TRUE) {
-                  CC_LOG_DEBUG("%s(%d): found fd in pollfd_arr",
-                               __FUNCTION__, __LINE__);
-                  
-                  for (i = del_index + 1 ; i< thr_pvt_p->num_pollfds; i++) {
-                      thr_pvt_p->pollfd_arr[i-1].fd =
-                          thr_pvt_p->pollfd_arr[i].fd;
-                      
-                      thr_pvt_p->pollfd_arr[i-1].events =
-                          thr_pvt_p->pollfd_arr[i].events;
-                      
-                      thr_pvt_p->pollfd_arr[i-1].revents =
-                          thr_pvt_p->pollfd_arr[i].revents;
-                  }
-                  thr_pvt_p->num_pollfds--;
-
-                  /* find and delete the list entry for this pipe fd */
-                  traverse = g_list_first(thr_pvt_p->fd_list);
-                  fd_entry_p = NULL;
-                  
-                  while (traverse != NULL) {
-                      if (((adpoll_fd_info_t *)(traverse->data))->fd == msg.fd) {
-                          fd_entry_p = (adpoll_fd_info_t *)(traverse->data);
+                                   thr_pvt_p->pollfd_arr[i].fd);
+                      if (msg.fd == thr_pvt_p->pollfd_arr[i].fd) {
+                          del_index = i;
+                          found = TRUE;
                           break;
                       }
-                      traverse = g_list_next(traverse);
                   }
-                  
-                  if (fd_entry_p) {
-                      thr_pvt_p->fd_list = g_list_remove(thr_pvt_p->fd_list,
-                                                         (gconstpointer) fd_entry_p);
+                  if (found == TRUE) {
+                      CC_LOG_DEBUG("%s(%d): found fd in pollfd_arr",
+                                   __FUNCTION__, __LINE__);
+                      
+                      for (i = del_index + 1 ; i< thr_pvt_p->num_pollfds; i++) {
+                          thr_pvt_p->pollfd_arr[i-1].fd =
+                              thr_pvt_p->pollfd_arr[i].fd;
+                          
+                          thr_pvt_p->pollfd_arr[i-1].events =
+                              thr_pvt_p->pollfd_arr[i].events;
+                          
+                          thr_pvt_p->pollfd_arr[i-1].revents =
+                              thr_pvt_p->pollfd_arr[i].revents;
+                      }
+                      thr_pvt_p->num_pollfds--;
+                      
+                      CC_LOG_DEBUG(POLLFD_COUNT_LOG "after DELETE_FD",
+                                   __FUNCTION__, __LINE__, tname,
+                                   thr_pvt_p->num_pollfds);
+                      
+                      /* find and delete the list entry for this pipe fd */
+                      traverse = g_list_first(thr_pvt_p->fd_list);
+                      fd_entry_p = NULL;
+                      
+                      while (traverse != NULL) {
+                          if (((adpoll_fd_info_t *)(traverse->data))->fd == msg.fd) {
+                              fd_entry_p = (adpoll_fd_info_t *)(traverse->data);
+                              break;
+                          }
+                          traverse = g_list_next(traverse);
+                      }
+                      
+                      if (fd_entry_p) {
+                          thr_pvt_p->fd_list = g_list_remove(thr_pvt_p->fd_list,
+                                                             (gconstpointer) fd_entry_p);
+                      } else {
+                          
+                          CC_LOG_ERROR("%s(%d)[%s]: inconsistent database "
+                                       "- pollfd found but fd entry not in list",
+                                       __FUNCTION__, __LINE__, tname);
+                      }
+                      if(cc_of_global.ofut_enable) {
+                          CC_LOG_DEBUG(FD_LIST_COUNT_LOG "DELETE_FD", __FUNCTION__, __LINE__,
+                                       tname, g_list_length(thr_pvt_p->fd_list));
+                      }
                   } else {
-
-                      CC_LOG_ERROR("%s(%d)[%s]: inconsistent database "
-                                   "- pollfd found but fd entry not in list",
-                                   __FUNCTION__, __LINE__, tname);
+                      CC_LOG_ERROR("%s(%d): NOT found fd in pollfd_arr",
+                                   __FUNCTION__, __LINE__);
                   }
-                  if(cc_of_global.ofut_enable) {
-                      CC_LOG_DEBUG(FD_LIST_COUNT_LOG "DELETE_FD", __FUNCTION__, __LINE__,
-                                   tname, g_list_length(thr_pvt_p->fd_list));
-                  }
-                  
-                  g_private_replace(&tname_key,
-                                    (gpointer)thr_pvt_p);
-
-                  //cond signal to delete the fds
-                  g_mutex_lock(thr_pvt_p->del_pipe_cv_mutex_p);
-                  g_cond_signal(thr_pvt_p->del_pipe_cv_cond_p);
-                  g_mutex_unlock(thr_pvt_p->del_pipe_cv_mutex_p);
-                  
-              } else {
-                  CC_LOG_ERROR("%s(%d): NOT found fd in pollfd_arr",
-                               __FUNCTION__, __LINE__);
               }
-
           } else {
               /* socket delete processing */
+              //DHURKA - TODO
           }
-          break;
       }
+      break;
       default:
         CC_LOG_FATAL("%s(%d): neither ADD_FD nor DELETE_FD",
                      __FUNCTION__, __LINE__);
     }
+
+    g_private_replace(&tname_key,
+                      (gpointer)thr_pvt_p);
+    
+    CC_LOG_DEBUG("_______________signaling  mutex %p__________",
+                 thr_pvt_p->add_del_pipe_cv_mutex);
+    g_mutex_lock((thr_pvt_p->add_del_pipe_cv_mutex));
+
+    CC_LOG_DEBUG("_______________got signaling lock cv %p__________",
+                 (thr_pvt_p->add_del_pipe_cv_cond));
+    g_cond_signal((thr_pvt_p->add_del_pipe_cv_cond));
+
+    CC_LOG_DEBUG("_______________end signaling %p__________",
+                 (thr_pvt_p->add_del_pipe_cv_mutex));
+    g_mutex_unlock((thr_pvt_p->add_del_pipe_cv_mutex));
+    CC_LOG_DEBUG("_______________release signaling lock %p__________",
+                 (thr_pvt_p->add_del_pipe_cv_mutex));
 }
 
 static void
@@ -622,6 +669,7 @@ adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p)
     adpoll_fd_info_t *fd_entry_p;
     pollthr_private_t *thr_pvt_p;
     char pollthr_name[MAX_NAME_LEN];
+    adpoll_thread_mgr_t *mgr = NULL;
 
     if (pollthr_data_p == NULL) {
         CC_LOG_FATAL("%s(%d): received NULL user data", __FUNCTION__, __LINE__);
@@ -640,9 +688,17 @@ adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p)
     thr_pvt_p->pollfd_arr = (struct pollfd *)malloc(sizeof(struct pollfd) *
                                                     pollthr_data_p->max_pollfds);
     thr_pvt_p->fd_list = NULL;
+//    thr_pvt_p->mgr = pollthr_data_p->mgr;
+//    mgr = *(thr_pvt_p->mgr);
+    thr_pvt_p->add_del_pipe_cv_mutex = pollthr_data_p->mgr->add_del_pipe_cv_mutex;
+    thr_pvt_p->add_del_pipe_cv_cond = pollthr_data_p->mgr->add_del_pipe_cv_cond;
+    thr_pvt_p->adp_thr_init_cv_mutex = pollthr_data_p->mgr->adp_thr_init_cv_mutex;
+    thr_pvt_p->adp_thr_init_cv_cond = pollthr_data_p->mgr->adp_thr_init_cv_cond;
 
-    thr_pvt_p->del_pipe_cv_mutex_p = pollthr_data_p->del_pipe_cv_mutex_p;
-    thr_pvt_p->del_pipe_cv_cond_p = pollthr_data_p->del_pipe_cv_cond_p;
+
+    CC_LOG_DEBUG("%s(%d):  mutex %p cond %p", __FUNCTION__, __LINE__,
+                 thr_pvt_p->add_del_pipe_cv_mutex, thr_pvt_p->add_del_pipe_cv_cond);
+    
     g_mutex_init(&thr_pvt_p->send_msg_htbl_lock);
     thr_pvt_p->send_msg_htbl = g_hash_table_new_full(g_direct_hash,
                                                      g_int_equal,
@@ -654,10 +710,7 @@ adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p)
     fd_entry_p->fd = pollthr_data_p->primary_pipe_rd_fd;
     fd_entry_p->fd_type = PIPE;
     fd_entry_p->pollin_func = &pollthr_pri_pipe_process_func;
-//    fd_entry_p->pollin_user_data = pollthr_name;
     fd_entry_p->pollout_func = NULL;
-//    fd_entry_p->pollout_user_data = NULL;
-        
 
     /* setup poll fd for primary pipe*/
     thr_pvt_p->pollfd_arr[0].fd = fd_entry_p->fd;
@@ -682,9 +735,9 @@ adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p)
                  thr_pvt_p->pollfd_arr[0].fd);
     
     /* synchronize completion of thread initialization */
-    g_mutex_lock(pollthr_data_p->adp_thr_init_cv_mutex_p);
-    g_cond_signal(pollthr_data_p->adp_thr_init_cv_cond_p);
-    g_mutex_unlock(pollthr_data_p->adp_thr_init_cv_mutex_p);
+    g_mutex_lock(pollthr_data_p->mgr->adp_thr_init_cv_mutex);
+    g_cond_signal(pollthr_data_p->mgr->adp_thr_init_cv_cond);
+    g_mutex_unlock(pollthr_data_p->mgr->adp_thr_init_cv_mutex);
 
     for( ; ; ) {
         CC_LOG_DEBUG("%s(%d)[%s] before poll",
@@ -694,6 +747,9 @@ adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p)
         
         thr_pvt_p = g_private_get(&tname_key);
 
+        CC_LOG_DEBUG("%s(%d): in poll loop - mutex %p cond %p", __FUNCTION__, __LINE__,
+                     thr_pvt_p->add_del_pipe_cv_mutex, thr_pvt_p->add_del_pipe_cv_cond);
+        
         if (thr_pvt_p->num_pollfds == 0) {
             /* self destruct */
             CC_LOG_DEBUG("%s(%d)[%s] num_pollfds ZERO. Self Destruct",
@@ -749,7 +805,23 @@ adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p)
     g_list_free_full(thr_pvt_p->fd_list, (GDestroyNotify)fd_entry_free);
     g_mutex_clear(&thr_pvt_p->send_msg_htbl_lock);
     g_hash_table_destroy(thr_pvt_p->send_msg_htbl);
-    free(thr_pvt_p);
+
+    
+    CC_LOG_DEBUG("adp_thr_mgr_poll_thread_func_______________signaling mutex %p__________",
+                 thr_pvt_p->add_del_pipe_cv_mutex);
+    g_mutex_lock((thr_pvt_p->add_del_pipe_cv_mutex));
+
+    CC_LOG_DEBUG("adp_thr_mgr_poll_thread_func_______________got signaling lock cv %p__________",
+                 (thr_pvt_p->add_del_pipe_cv_cond));
+    g_cond_signal((thr_pvt_p->add_del_pipe_cv_cond));
+
+    CC_LOG_DEBUG("adp_thr_mgr_poll_thread_func_______________end signaling %p__________",
+                 (thr_pvt_p->add_del_pipe_cv_mutex));
+    g_mutex_unlock((thr_pvt_p->add_del_pipe_cv_mutex));
+    CC_LOG_DEBUG("adp_thr_mgr_poll_thread_func_______________release signaling lock %p__________",
+                 (thr_pvt_p->add_del_pipe_cv_mutex));
+    
+    free(thr_pvt_p);    
 }
 
 uint32_t

@@ -5,7 +5,6 @@
 #define CC_NET_CONN_H
 
 #include "cc_pollthr_mgr.h"
-#include "cc_of_common.h"
 
 #define MAXBUF 65535
 /* Is this optimal? */
@@ -23,10 +22,38 @@ typedef enum L4_type_ {
     MAX_L4_TYPE
 } L4_type_e;
 
+#ifndef CC_OFVER
+#define CC_OFVER
+typedef enum cc_ofver_ {
+    CC_OFVER_1_0   = 0,
+    CC_OFVER_1_3,
+    CC_OFVER_1_3_1,
+    MAX_OFVER_TYPE
+} cc_ofver_e;
+#endif
+
 typedef enum addr_type_ {
     IPV4,
     IPV6
 } addr_type_e;
+
+/**
+ * cc_of_recv_pkt
+ *
+ * Description:
+ * This callback function is called by the library when a packet is received
+ * from the socket.
+ *
+ * Returns:
+ * Status
+ *
+ * Notes:
+ * 01. This will be a callback. 
+ *
+ */
+typedef int (*cc_of_recv_pkt)(uint64_t dp_id, uint8_t aux_id,
+                              void *of_msg, 
+                              size_t of_msg_len);
 
 typedef struct cc_ofdev_key_ {
     ipaddr_v4v6_t  controller_ip_addr;

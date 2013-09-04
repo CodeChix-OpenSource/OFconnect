@@ -135,7 +135,7 @@ typedef struct adpoll_pollthr_data_ {
     char tname[MAX_NAME_LEN];
     int max_pollfds;
     int primary_pipe_rd_fd;
-    adpoll_thread_mgr_t **mgr;
+    adpoll_thread_mgr_t *mgr;
 } adpoll_pollthr_data_t;
 
 typedef struct adpoll_send_msg_htbl_key_ {
@@ -192,7 +192,10 @@ typedef struct pollthr_private_ {
     GList         *fd_list;
     GHashTable    *send_msg_htbl;
     GMutex	  send_msg_htbl_lock;
-    adpoll_thread_mgr_t **mgr;
+    GMutex        *add_del_pipe_cv_mutex;
+    GCond         *add_del_pipe_cv_cond;
+    GMutex        *adp_thr_init_cv_mutex;
+    GCond         *adp_thr_init_cv_cond;
 } pollthr_private_t;
 
 adpoll_thread_mgr_t *

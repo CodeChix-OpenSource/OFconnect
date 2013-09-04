@@ -85,15 +85,6 @@ gboolean cc_ofrw_htbl_equal_func(gconstpointer a, gconstpointer b)
 }
 
 
-/* Call destroy lib for error cases */
-int
-cc_of_lib_abort()
-{
-    CC_LOG_ERROR("%s NOT IMPLEMENTED", __FUNCTION__);
-    return CC_OF_OK;
-}
-
-
 int
 cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type)
 {
@@ -117,7 +108,7 @@ cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type)
                                                     cc_ofdev_htbl_destroy_val);
     if (cc_of_global.ofdev_htbl == NULL) {
 	    status = CC_OF_EHTBL;
-	    cc_of_lib_abort();
+	    cc_of_lib_free();
 	    CC_LOG_FATAL("%s(%d): %s", __FUNCTION__, __LINE__,
                      cc_of_strerror(status));
     }
@@ -129,7 +120,7 @@ cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type)
                                                         cc_of_destroy_generic);
     if (cc_of_global.ofdev_htbl == NULL) {
 	    status = CC_OF_EHTBL;
-	    cc_of_lib_abort();
+	    cc_of_lib_free();
 	    CC_LOG_FATAL("%s(%d): %s", __FUNCTION__, __LINE__,
                      cc_of_strerror(status));
     }
@@ -142,7 +133,7 @@ cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type)
 
     if (cc_of_global.ofdev_htbl == NULL) {
 	    status = CC_OF_EHTBL;
-	    cc_of_lib_abort();
+	    cc_of_lib_free();
 	    CC_LOG_FATAL("%s(%d): %s", __FUNCTION__, __LINE__,
                      cc_of_strerror(status));
     }
@@ -156,7 +147,7 @@ cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type)
                                                       MAX_PIPE_PER_THR_MGR);
     if (cc_of_global.oflisten_pollthr_p == NULL) {
 	    status = CC_OF_EMISC;
-	    cc_of_lib_abort();
+	    cc_of_lib_free();
 	    CC_LOG_FATAL("%s(%d): %s", __FUNCTION__, __LINE__,
                      cc_of_strerror(status));
     }
@@ -165,7 +156,7 @@ cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type)
     if ((status = cc_create_rw_pollthr(NULL, 
                                        MAX_PER_THREAD_RWSOCKETS, 
                                        MAX_PIPE_PER_THR_MGR)) < 0) {
-	    cc_of_lib_abort();
+	    cc_of_lib_free();
 	    CC_LOG_FATAL("%s(%d): %s", __FUNCTION__, __LINE__, 
                      cc_of_strerror(status));
     }
@@ -178,8 +169,8 @@ cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type)
 
 
 // TODO: switch case for switch
-int cc_of_dev_register(ipaddr_v4v6_t controller_ip_addr, 
-                       ipaddr_v4v6_t switch_ip_addr, 
+int cc_of_dev_register(uint32_t controller_ipaddr, 
+                       uint32_t switch_ipaddr, 
                        uint16_t controller_L4_port,
                        cc_ofver_e max_ofver, 
                        cc_of_recv_pkt recv_func) {
@@ -188,6 +179,14 @@ int cc_of_dev_register(ipaddr_v4v6_t controller_ip_addr,
     cc_ofdev_info_t *dev_info;
     char switch_ip[INET_ADDRSTRLEN];
     char controller_ip[INET_ADDRSTRLEN]; 
+    ipaddr_v4v6_t controller_ip_addr = (ipaddr_v4v6_t)controller_ipaddr;
+    ipaddr_v4v6_t switch_ip_addr = (ipaddr_v4v6_t)switch_ipaddr;
+
+    if (max_ofver >= MAX_OFVER_TYPE) {
+        CC_LOG_ERROR("%s(%d): max openflow version invalid", 
+                     __FUNCTION__, __LINE__);
+        return CC_OF_EINVAL;
+    }
    
     key = g_malloc0(sizeof(cc_ofdev_key_t));
     if (key == NULL) {
@@ -252,7 +251,7 @@ int cc_of_dev_register(ipaddr_v4v6_t controller_ip_addr,
 }
 
 cc_of_ret
-cc_of_send_pkt(cc_ofchannel_key_t chann_id, void *of_msg, 
+cc_of_send_pkt(uint64_t dp_id, uint8_t aux_id, void *of_msg, 
                size_t msg_len)
 {
     cc_ofchannel_info_t *chann_info;
@@ -260,6 +259,10 @@ cc_of_send_pkt(cc_ofchannel_key_t chann_id, void *of_msg,
     int send_rwsock;    
     adpoll_send_msg_t  *msg_p;
     msg_p = (adpoll_send_msg_t *)SEND_MSG_BUF;
+    cc_ofchannel_key_t chann_id;
+
+    chann_id.dp_id = dp_id;
+    chann_id.aux_id = aux_id;
 
     if (of_msg == NULL) {
         CC_LOG_ERROR("%s(%d): message is invalid",

@@ -12,12 +12,6 @@
 typedef uint32_t ipaddr_v4_t;
 typedef ipaddr_v4_t ipaddr_v4v6_t;
 
-typedef enum of_drv_type_ {
-    CLIENT = 0,
-    SERVER,
-    MAX_OF_DRV_TYPE
-} of_drv_type_e;
-
 typedef enum L4_type_ {
     /* used for array index */
     TCP = 0,
@@ -28,16 +22,38 @@ typedef enum L4_type_ {
     MAX_L4_TYPE
 } L4_type_e;
 
+#ifndef CC_OFVER
+#define CC_OFVER
+typedef enum cc_ofver_ {
+    CC_OFVER_1_0   = 0,
+    CC_OFVER_1_3,
+    CC_OFVER_1_3_1,
+    MAX_OFVER_TYPE
+} cc_ofver_e;
+#endif
+
 typedef enum addr_type_ {
     IPV4,
     IPV6
 } addr_type_e;
 
-typedef enum of_dev_type_ {
-    SWITCH = 0,
-    CONTROLLER,
-    MAX_OF_DEV_TYPE
-} of_dev_type_e;
+/**
+ * cc_of_recv_pkt
+ *
+ * Description:
+ * This callback function is called by the library when a packet is received
+ * from the socket.
+ *
+ * Returns:
+ * Status
+ *
+ * Notes:
+ * 01. This will be a callback. 
+ *
+ */
+typedef int (*cc_of_recv_pkt)(uint64_t dp_id, uint8_t aux_id,
+                              void *of_msg, 
+                              size_t of_msg_len);
 
 typedef struct cc_ofdev_key_ {
     ipaddr_v4v6_t  controller_ip_addr;
@@ -63,14 +79,9 @@ typedef struct cc_ofchann_info_ {
     cc_ofstats_t          stats;    
 } cc_ofchannel_info_t;
 
-
-typedef int (*cc_of_recv_pkt)(cc_ofchannel_key_t chann_id,
-                              void *of_msg,
-                              size_t of_msg_len);
-
 /* node in ofdev_htbl */
 typedef struct cc_ofdev_info_ {
-    uint32_t       of_max_ver;  /* cc_ofver_e */
+    cc_ofver_e     of_max_ver;  /* cc_ofver_e */
     
     GList          *ofrw_socket_list; //list of rw sockets
     GMutex	       ofrw_socket_list_lock;

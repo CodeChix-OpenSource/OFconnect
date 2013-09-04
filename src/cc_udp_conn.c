@@ -27,7 +27,7 @@ net_svcs_t udp_sockfns = {
 
 static void process_udpfd_pollin_func(char *tname UNUSED,
                                       adpoll_fd_info_t *data_p UNUSED,
-                                      void *unused_data UNUSED)
+                                      adpoll_send_msg_htbl_info_t *unused_data UNUSED)
 {
     /* TODO: Impl this */
     CC_LOG_ERROR("%s NOT IMPLEMENTED, %s, %p", __FUNCTION__, tname, data_p);

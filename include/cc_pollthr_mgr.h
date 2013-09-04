@@ -124,10 +124,10 @@ typedef struct adpoll_thread_mgr {
     uint32_t      max_pipes;
     int           *pipes_arr;
     GThread       *thread_p;
-    GMutex        del_pipe_cv_mutex;
-    GCond         del_pipe_cv_cond;
-    GMutex        adp_thr_init_cv_mutex;
-    GCond         adp_thr_init_cv_cond;
+    GMutex        *add_del_pipe_cv_mutex;
+    GCond         *add_del_pipe_cv_cond;
+    GMutex        *adp_thr_init_cv_mutex;
+    GCond         *adp_thr_init_cv_cond;
 } adpoll_thread_mgr_t;
 
 /* parameter for starting new thread manager */
@@ -135,10 +135,7 @@ typedef struct adpoll_pollthr_data_ {
     char tname[MAX_NAME_LEN];
     int max_pollfds;
     int primary_pipe_rd_fd;
-    GMutex  *del_pipe_cv_mutex_p;
-    GCond   *del_pipe_cv_cond_p;
-    GMutex  *adp_thr_init_cv_mutex_p;
-    GCond   *adp_thr_init_cv_cond_p;
+    adpoll_thread_mgr_t **mgr;
 } adpoll_pollthr_data_t;
 
 typedef struct adpoll_send_msg_htbl_key_ {
@@ -193,10 +190,9 @@ typedef struct pollthr_private_ {
     int           num_pollfds;
     struct pollfd *pollfd_arr;
     GList         *fd_list;
-    GMutex        *del_pipe_cv_mutex_p;
-    GCond         *del_pipe_cv_cond_p;
     GHashTable    *send_msg_htbl;
-    GMutex	  send_msg_htbl_lock;    
+    GMutex	  send_msg_htbl_lock;
+    adpoll_thread_mgr_t **mgr;
 } pollthr_private_t;
 
 adpoll_thread_mgr_t *

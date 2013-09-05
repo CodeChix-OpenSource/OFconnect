@@ -87,10 +87,9 @@ read_logfile()
 void
 write_logfile_lock(char *msg)
 {
-    int n=0;
     g_mutex_lock(&cc_of_global.oflog_lock);
     if (cc_of_global.oflog_enable) {
-        n=fprintf(cc_of_global.oflog_fd, "%s", msg);
+        fprintf(cc_of_global.oflog_fd, "%s", msg);
     }
     g_mutex_unlock(&cc_of_global.oflog_lock);
 }

@@ -131,7 +131,8 @@ static void process_tcpfd_pollin_func(char *tname UNUSED,
         g_mutex_unlock(&dev_info->ofrw_socket_list_lock);
 
         /* Send data to controller/switch via their callback */
-        dev_info->recv_func(*channel_key_tmp, buf, read_len);
+        dev_info->recv_func(channel_key_tmp->dp_id, channel_key_tmp->aux_id, 
+                            buf, read_len);
         CC_LOG_INFO("%s(%d): read a pkt on tcp sockfd: %d and sent it to" 
                     "controller/switch", __FUNCTION__, __LINE__, tcp_sockfd);
 

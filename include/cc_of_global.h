@@ -16,9 +16,6 @@
 
 
 typedef struct cc_of_global_ {
-    /* driver type could be client or server */
-    of_drv_type_e     ofdrv_type;
-
     /* layer4 device type could be switch or controller */
     of_dev_type_e     ofdev_type;
 
@@ -28,7 +25,7 @@ typedef struct cc_of_global_ {
 
     /* node:  cc_ofchannel_info_t */
     GHashTable       *ofchannel_htbl;
-    GMutex	     ofchannel_htbl_lock;
+    GMutex	         ofchannel_htbl_lock;
 
     /*node: cc_ofrw_info_t */
     GHashTable       *ofrw_htbl;

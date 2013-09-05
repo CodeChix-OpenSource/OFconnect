@@ -12,6 +12,8 @@
 typedef uint32_t ipaddr_v4_t;
 typedef ipaddr_v4_t ipaddr_v4v6_t;
 
+#ifndef L4_TYPE
+#define L4_TYPE
 typedef enum L4_type_ {
     /* used for array index */
     TCP = 0,
@@ -21,6 +23,7 @@ typedef enum L4_type_ {
     /* additional types here */ 
     MAX_L4_TYPE
 } L4_type_e;
+#endif
 
 #ifndef CC_OFVER
 #define CC_OFVER
@@ -73,7 +76,7 @@ typedef struct cc_ofstats_ {
     uint32_t  tx_drops;
 } cc_ofstats_t;
 
-typedef struct cc_ofchann_info_ {
+typedef struct cc_ofchannel_info_ {
     int                   rw_sockfd;
     int                   count_retries; /* CLIENT: reconnection attempts */
     cc_ofstats_t          stats;    
@@ -86,7 +89,7 @@ typedef struct cc_ofdev_info_ {
     GList          *ofrw_socket_list; //list of rw sockets
     GMutex	       ofrw_socket_list_lock;
 
-    cc_of_recv_pkt       recv_func; /* cc_of_recv_pkt function ptr */
+    cc_of_recv_pkt recv_func; /* cc_of_recv_pkt function ptr */
 
     int            main_sockfd_tcp;
     int            main_sockfd_udp;
@@ -111,7 +114,7 @@ typedef struct cc_ofrw_info_ {
 } cc_ofrw_info_t;
 
 typedef struct net_svcs_ {
-    int (*open_clientfd)(cc_ofdev_key_t key);
+    int (*open_clientfd)(cc_ofdev_key_t key, cc_ofchannel_key_t ofchann_key);
     int (*open_serverfd)(cc_ofdev_key_t key);
     int (*accept_conn)(int listenfd, cc_ofdev_key_t key);
     int (*close_conn)(int sockfd);

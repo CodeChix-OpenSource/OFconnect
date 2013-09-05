@@ -165,6 +165,38 @@ del_ofchann_rwsocket(int rwsock)
     return CC_OF_OK;
 }
 
+cc_of_ret
+find_ofchann_key_rwsocket(int sockfd, cc_ofchannel_key_t **fd_chann_key) {
+
+    cc_of_ret status = CC_OF_OK;
+    cc_ofchannel_key_t *channel_key_tmp = NULL;
+    GHashTableIter ofchannel_iter;
+    cc_ofchannel_key_t *channel_key = NULL;
+    cc_ofchannel_info_t *channel_info = NULL;
+
+    /*   
+     * Do a reverse lookup to get the channel_key
+     * corresponding to this sockfd
+     */
+
+    g_hash_table_iter_init(&ofchannel_iter, cc_of_global.ofchannel_htbl);
+    if (g_hash_table_iter_next(&ofchannel_iter, (gpointer *)&channel_key, (gpointer *)&channel_info)) {
+        if (channel_info->rw_sockfd == sockfd) {
+            channel_key_tmp = channel_key;
+        }
+    }
+
+    if (channel_key_tmp == NULL) {
+        CC_LOG_ERROR("%s(%d): could not find channel_key for rwsock %d"
+                     , __FUNCTION__, __LINE__, sockfd);
+        return CC_OF_EHTBL;
+    }
+
+    *fd_chann_key = channel_key_tmp;
+    return status;
+}
+
+
 cc_of_ret add_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
 {
     cc_ofdev_info_t *ofdev = NULL;
@@ -223,10 +255,10 @@ del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
 
 cc_of_ret
 atomic_add_upd_htbls_with_rwsocket(int sockfd, adpoll_thread_mgr_t  *thr_mgr, 
-                                   cc_ofdev_key_t key, L4_type_e layer4_proto)
+                                   cc_ofdev_key_t key, L4_type_e layer4_proto,
+                                   cc_ofchannel_key_t ofchann_key)
 {
     cc_of_ret status = CC_OF_OK;
-    cc_ofchannel_key_t chann_key;
 
     if((status = add_upd_ofrw_rwsocket(sockfd, thr_mgr, layer4_proto, key)) < 0) {
         CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
@@ -240,14 +272,33 @@ atomic_add_upd_htbls_with_rwsocket(int sockfd, adpoll_thread_mgr_t  *thr_mgr,
 	} 
     
     /* update ofchannel htbl */
-    chann_key.dp_id = sockfd;
-    chann_key.aux_id = sockfd;
-    if ((status = add_upd_ofchann_rwsocket(chann_key, sockfd)) < 0) {
-         CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
-         del_ofdev_rwsocket(key, sockfd);
-         del_ofrw_rwsocket(sockfd);
-         return status;
+
+    /* If controller, use sockfd as dummy dp_id/aux_id until we recv 
+     * first mesg on this fd and then update the actual aux_id/dp_id 
+     * in the ofchann_key.
+     *
+     * If switch, then use the dp_id/aux_id sent by the switch itself
+     */
+    if (cc_of_global.ofdev_type == CONTROLLER) {
+        cc_ofchannel_key_t controller_chann_key;
+
+        controller_chann_key.dp_id = sockfd;
+        controller_chann_key.aux_id = sockfd;
+        if ((status = add_upd_ofchann_rwsocket(controller_chann_key, sockfd)) < 0) {
+            CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
+            del_ofdev_rwsocket(key, sockfd);
+            del_ofrw_rwsocket(sockfd);
+            return status;
+        }
+    } else if (cc_of_global.ofdev_type == SWITCH) {
+        if ((status = add_upd_ofchann_rwsocket(ofchann_key, sockfd)) < 0) {
+            CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
+            del_ofdev_rwsocket(key, sockfd);
+            del_ofrw_rwsocket(sockfd);
+            return status;
+        }
     }
+
 	CC_LOG_DEBUG("%s(%d): Atomically added sockfd to ofrw & ofdev"
                  "htbls", __FUNCTION__, __LINE__);
     
@@ -420,7 +471,7 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, adpoll_thr_msg_t *thr_msg)
 
 cc_of_ret
 cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key,
-                         L4_type_e layer4_proto)
+                         L4_type_e layer4_proto, cc_ofchannel_key_t ofchann_key)
 {
     cc_of_ret status = CC_OF_OK;
     adpoll_thread_mgr_t *tmgr = NULL;
@@ -439,7 +490,7 @@ cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key,
 	
 	    /* add fd to global structures */
 	    status = atomic_add_upd_htbls_with_rwsocket(thr_msg->fd, tmgr, key, 
-                                                        layer4_proto);
+                                                        layer4_proto, ofchann_key);
 	    if (status < 0) {
 	        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
                          cc_of_strerror(status));

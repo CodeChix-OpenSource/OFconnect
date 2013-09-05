@@ -5,7 +5,7 @@
 #define LISTENQ 1024
 
 /* Forward Declarations */
-cc_of_ret tcp_open_clientfd(cc_ofdev_key_t key);
+cc_of_ret tcp_open_clientfd(cc_ofdev_key_t key, cc_ofchannel_key_t ofchann_key);
 cc_of_ret tcp_open_listenfd(cc_ofdev_key_t key);
 cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key);
 cc_of_ret tcp_close(int sockfd);
@@ -69,8 +69,12 @@ static void process_tcpfd_pollin_func(char *tname UNUSED,
 {
     char buf[MAXBUF]; /* Allocate buf to read data */
     ssize_t read_len = 0;
-    cc_ofchannel_key_t *channel_key_tmp;
+    cc_ofchannel_key_t *fd_chann_key;
     int tcp_sockfd = data_p->fd;
+    cc_of_ret status = CC_OF_OK;
+    cc_ofrw_key_t rwkey;
+    cc_ofrw_info_t *rwinfo = NULL;
+    cc_ofdev_info_t *devinfo = NULL;
     
     if (data_p == NULL) {
         CC_LOG_ERROR("%s(%d): received NULL data",
@@ -79,31 +83,16 @@ static void process_tcpfd_pollin_func(char *tname UNUSED,
     }
 
     /* Read data from socket */
-    if ((read_len = tcp_read(tcp_sockfd, buf, MAXBUF, 0, NULL, 0)) < 0) {
+    if ((read_len = tcp_read(tcp_sockfd, buf, MAXBUF, 0, NULL, NULL)) < 0) {
         CC_LOG_ERROR("%s(%d): %s, Error while reading pkt on tcp sockfd: %d",
                      __FUNCTION__, __LINE__, strerror(errno), tcp_sockfd);
         return;
     }
 
-    /*
-     * Do a reverse lookup to get the channel_key
-     * corresponding to this tcp sockfd
-     */
-    GHashTableIter ofchannel_iter;
-    cc_ofchannel_key_t *channel_key;
-    cc_ofchannel_info_t *channel_info;
-
-    g_hash_table_iter_init(&ofchannel_iter, cc_of_global.ofchannel_htbl);
-    if (g_hash_table_iter_next(&ofchannel_iter, (gpointer *)&channel_key, (gpointer *)&channel_info)) {
-        if (channel_info->rw_sockfd == tcp_sockfd) {
-            channel_key_tmp = channel_key;
-        }
-    }
-
-    if (channel_key_tmp == NULL) {
-        CC_LOG_ERROR("%s(%d): could not find channel_key for rwsock %d"
-                     , __FUNCTION__, __LINE__,
-                     tcp_sockfd);
+    status = find_ofchann_key_rwsocket(tcp_sockfd, &fd_chann_key);
+    if (status < 0) {
+        CC_LOG_ERROR("%s(%d): could not find ofchann key for sockfd %d",
+                     __FUNCTION__, __LINE__, tcp_sockfd);
         return;
     }
 
@@ -111,33 +100,27 @@ static void process_tcpfd_pollin_func(char *tname UNUSED,
      * Do a reverse lookup to get the dev_key 
      * corresponding to this tcp sockfd
      */
-    GHashTableIter ofdev_iter;
-    cc_ofdev_key_t *dev_key;
-    cc_ofdev_info_t *dev_info;
-
-    g_hash_table_iter_init(&ofdev_iter, cc_of_global.ofdev_htbl);
-    if (g_hash_table_iter_next(&ofdev_iter, (gpointer *)&dev_key, (gpointer *)&dev_info)) {
-        GList *tmp_list;
-
-        g_mutex_lock(&dev_info->ofrw_socket_list_lock);
-        tmp_list = g_list_find(dev_info->ofrw_socket_list, &tcp_sockfd);
-        if (tmp_list == NULL) {
-            CC_LOG_ERROR("%s(%d): could not find rwsock %d in"
-                         "ofrw_socket_list", __FUNCTION__, __LINE__, 
-                         tcp_sockfd);
-            g_mutex_unlock(&dev_info->ofrw_socket_list_lock);
-            return;
-        }
-        g_mutex_unlock(&dev_info->ofrw_socket_list_lock);
-
-        /* Send data to controller/switch via their callback */
-        dev_info->recv_func(channel_key_tmp->dp_id, channel_key_tmp->aux_id, 
-                            buf, read_len);
-        CC_LOG_INFO("%s(%d): read a pkt on tcp sockfd: %d and sent it to" 
-                    "controller/switch", __FUNCTION__, __LINE__, tcp_sockfd);
-
+    rwkey.rw_sockfd = tcp_sockfd;
+    rwinfo = g_hash_table_lookup(cc_of_global.ofrw_htbl, &rwkey);
+    if (rwinfo == NULL) {
+        CC_LOG_ERROR("%s(%d): could not find rwsockinfo in ofrw_htbl"
+                     "for sockfd-%d", __FUNCTION__, __LINE__, rwkey.rw_sockfd);
+        return;
     }
 
+    devinfo = g_hash_table_lookup(cc_of_global.ofdev_htbl, &(rwinfo->dev_key));
+    if (devinfo == NULL) {
+        CC_LOG_ERROR("%s(%d): could not find devinfo in ofdev_htbl"
+                     "for device", __FUNCTION__, __LINE__);
+        return;
+    }
+
+    /* Send data to controller/switch via their callback */
+    devinfo->recv_func(fd_chann_key->dp_id, fd_chann_key->aux_id, 
+                        buf, read_len);
+    CC_LOG_INFO("%s(%d): read a pkt on tcp sockfd: %d, aux_id: %lu, dp_id: %u"
+                "and sent it to controller/switch", __FUNCTION__, __LINE__, 
+                tcp_sockfd, fd_chann_key->dp_id, fd_chann_key->aux_id);
 }
 
 
@@ -145,9 +128,7 @@ static void process_tcpfd_pollout_func(char *tname UNUSED,
                                        adpoll_fd_info_t *data_p,
                                        adpoll_send_msg_htbl_info_t *send_msg_p)
 {
-    cc_of_ret status = CC_OF_OK;
     int tcp_sockfd = 0;
-    adpoll_thread_mgr_t *tmgr = NULL;
 
     if (data_p == NULL) {
         CC_LOG_ERROR("%s(%d): received NULL data",
@@ -160,12 +141,6 @@ static void process_tcpfd_pollout_func(char *tname UNUSED,
     }
 
     tcp_sockfd = data_p->fd;
-    status = find_thrmgr_rwsocket(tcp_sockfd, &tmgr);
-    if (status < 0) {
-        CC_LOG_ERROR("%s(%d): could not find tmgr for tcp sockfd %d",
-                     __FUNCTION__, __LINE__, tcp_sockfd);
-        return;
-    }
 
     /* Call tcpsocket send fn */
     if (tcp_write(tcp_sockfd, send_msg_p->data, send_msg_p->data_size, 0, NULL, 0) < 0) {
@@ -180,7 +155,7 @@ static void process_tcpfd_pollout_func(char *tname UNUSED,
 }
 
 
-cc_of_ret tcp_open_clientfd(cc_ofdev_key_t key)
+cc_of_ret tcp_open_clientfd(cc_ofdev_key_t key, cc_ofchannel_key_t ofchann_key)
 {
     int clientfd;
     cc_of_ret status = CC_OF_OK;
@@ -201,7 +176,7 @@ cc_of_ret tcp_open_clientfd(cc_ofdev_key_t key)
     }
     memset(&localaddr, 0, sizeof(localaddr));
     localaddr.sin_family = AF_INET;
-    localaddr.sin_addr.s_addr = ntohl(key.switch_ip_addr);
+    localaddr.sin_addr.s_addr = htonl(key.switch_ip_addr);
     localaddr.sin_port = 0;  
     
     // Bind clienfd to a local interface addr
@@ -213,7 +188,7 @@ cc_of_ret tcp_open_clientfd(cc_ofdev_key_t key)
  
     memset(&serveraddr, 0, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
-    serveraddr.sin_addr.s_addr = ntohl(key.controller_ip_addr);
+    serveraddr.sin_addr.s_addr = htonl(key.controller_ip_addr);
     serveraddr.sin_port = htons(key.controller_L4_port);
 
     // Establish connection with server
@@ -231,13 +206,11 @@ cc_of_ret tcp_open_clientfd(cc_ofdev_key_t key)
     thr_msg.fd_action = ADD;
     thr_msg.poll_events = POLLIN | POLLOUT;
     thr_msg.pollin_func = &process_tcpfd_pollin_func;
-//    thr_msg.pollin_user_data = NULL; // do we need this ??
     thr_msg.pollout_func = &process_tcpfd_pollout_func;
-//    thr_msg.pollout_user_data = NULL; // do we need this ??
         
-    status = cc_add_sockfd_rw_pollthr(&thr_msg, key, TCP);
+    status = cc_add_sockfd_rw_pollthr(&thr_msg, key, TCP, ofchann_key);
     if (status < 0) {
-	    CC_LOG_ERROR("%s(%d):Error updating sockfd in global structures: %s",
+	    CC_LOG_ERROR("%s(%d):Error updating tcp sockfd in global structures: %s",
                      __FUNCTION__, __LINE__, cc_of_strerror(errno));
 	    close(clientfd);
 	    return status;
@@ -269,7 +242,7 @@ cc_of_ret tcp_open_listenfd(cc_ofdev_key_t key)
 
     memset(&serveraddr, 0, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
-    serveraddr.sin_addr.s_addr = ntohl(key.controller_ip_addr);
+    serveraddr.sin_addr.s_addr = htonl(key.controller_ip_addr);
     serveraddr.sin_port = htons(key.controller_L4_port);
     
     if ((status = bind(listenfd, (struct sockaddr *)&serveraddr, 
@@ -289,11 +262,15 @@ cc_of_ret tcp_open_listenfd(cc_ofdev_key_t key)
     thr_msg.fd_action = ADD;
     thr_msg.poll_events = POLLIN;
     thr_msg.pollin_func = &process_listenfd_pollin_func;
-//    thr_msg.pollin_user_data = NULL; 
     thr_msg.pollout_func = NULL;
-//    thr_msg.pollout_user_data = NULL;
 
-    adp_thr_mgr_add_del_fd(cc_of_global.oflisten_pollthr_p, &thr_msg);
+    status = adp_thr_mgr_add_del_fd(cc_of_global.oflisten_pollthr_p, &thr_msg);
+    if (status < 0) {
+        CC_LOG_ERROR("%s(%d):Error adding listenfd to oflisten_pollthr_p: %s",
+                     __FUNCTION__, __LINE__, cc_of_strerror(errno));
+        close(listenfd);
+        return status;
+    }
 
     return listenfd;
 }
@@ -307,6 +284,7 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
     socklen_t addrlen = sizeof(struct sockaddr_in);
     adpoll_thr_msg_t thr_msg;
     cc_ofdev_key_t dev_key;
+    cc_ofchannel_key_t chann_key;
 
     if ((connfd = accept(listenfd, (struct sockaddr *) &clientaddr, 
                          &addrlen)) < 0 ) {
@@ -320,15 +298,13 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
     thr_msg.fd_action = ADD;
     thr_msg.poll_events = POLLIN | POLLOUT;
     thr_msg.pollin_func = &process_tcpfd_pollin_func;
-//    thr_msg.pollin_user_data = NULL; // do we need this ??
     thr_msg.pollout_func = &process_tcpfd_pollout_func;
-//    thr_msg.pollout_user_data = NULL; // do we need this ??
     
     dev_key.controller_ip_addr = key.controller_ip_addr;
     dev_key.switch_ip_addr = ntohl(clientaddr.sin_addr.s_addr);
     dev_key.controller_L4_port = key.controller_L4_port; 
 
-    status = cc_add_sockfd_rw_pollthr(&thr_msg, dev_key, TCP);
+    status = cc_add_sockfd_rw_pollthr(&thr_msg, dev_key, TCP, chann_key);
     if (status < 0) {
 	    CC_LOG_ERROR("%s(%d):Error updating sockfd in global structures: %s",
                      __FUNCTION__, __LINE__, cc_of_strerror(errno));
@@ -375,7 +351,7 @@ cc_of_ret tcp_close(int sockfd)
     // Update global htbls
     status = cc_del_sockfd_rw_pollthr(tmgr, &thr_msg);
     if (status < 0) {
-        CC_LOG_ERROR("%s(%d): %s, error while deleting sockfd %d "
+        CC_LOG_ERROR("%s(%d): %s, error while deleting tcp sockfd %d "
                      "from global structures", __FUNCTION__, __LINE__, 
                      cc_of_strerror(status), sockfd);
         return status;

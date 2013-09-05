@@ -4,8 +4,6 @@
 #ifndef CC_OF_LIB_H
 #define CC_OF_LIB_H
 
-#include "cc_net_conn.h"
-
 #define SEND_MSG_BUF_SIZE 1024
 char SEND_MSG_BUF[SEND_MSG_BUF_SIZE];
 
@@ -40,11 +38,27 @@ static const char * cc_of_errtable[] = {
 
 inline const char *cc_of_strerror(int errnum);
 
+#ifndef CC_OFVER
+#define CC_OFVER
 typedef enum cc_ofver_ {
     CC_OFVER_1_0   = 0,
     CC_OFVER_1_3,
-    CC_OFVER_1_3_1
+    CC_OFVER_1_3_1,
+    MAX_OFVER_TYPE
 } cc_ofver_e;
+#endif
+
+typedef enum of_dev_type_ {
+    SWITCH = 0,
+    CONTROLLER,
+    MAX_OF_DEV_TYPE
+} of_dev_type_e;
+
+typedef enum of_drv_type_ {
+    CLIENT = 0,
+    SERVER,
+    MAX_OF_DRV_TYPE
+} of_drv_type_e;
 
 #define CC_OF_ERRTABLE_SIZE (sizeof(cc_of_errtable) / sizeof(cc_of_errtable[0]))
 
@@ -63,9 +77,11 @@ typedef enum cc_ofver_ {
  * 01. This will be a callback. 
  *
  */
-typedef int (*cc_of_recv_pkt)(cc_ofchannel_key_t chann_id,
+typedef int (*cc_of_recv_pkt)(uint64_t dp_id, uint8_t aux_id,
                               void *of_msg, 
                               size_t of_msg_len);
+
+
 
 /**
  * cc_of_lib_init
@@ -87,26 +103,24 @@ typedef int (*cc_of_recv_pkt)(cc_ofchannel_key_t chann_id,
  *     
  */
 int 
-cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type);
+cc_of_lib_init(of_dev_type_e dev_type, 
+               of_drv_type_e drv_type);
 
 int
 cc_of_lib_free(void);
 
-/* Why do we need this? */
-int 
-cc_of_lib_abort(void);
-
-
 int
-cc_of_dev_register(ipaddr_v4v6_t controller_ip_addr,
-                   ipaddr_v4v6_t switch_ip_addr,
+cc_of_dev_register(uint32_t controller_ip,
+                   uint32_t switch_ip,
                    uint16_t controller_L4_port,
                    cc_ofver_e max_ofver,
                    cc_of_recv_pkt recv_func /*func ptr*/);
 /* possible additional fields for TLS certificate */
 
 int
-cc_of_dev_free(cc_ofdev_key_t dev_key);
+cc_of_dev_free(uint32_t controller_ip,
+               uint32_t switch_ip,
+               uint16_t controller_L4_port);
 
 /**
  * cc_of_create_channel
@@ -120,8 +134,11 @@ cc_of_dev_free(cc_ofdev_key_t dev_key);
  *
  */
 int 
-cc_of_create_channel(cc_ofdev_key_t dev_key,
-                     cc_ofchannel_key_t chann_id); /*noop for controller */
+cc_of_create_channel(uint32_t controller_ip,
+                     uint32_t switch_ip,
+                     uint16_t controller_L4_port,
+                     uint64_t dp_id, 
+                     uint8_t aux_id); /*noop for controller */
 /**
  * cc_of_destroy_channel
  *
@@ -136,7 +153,8 @@ cc_of_create_channel(cc_ofdev_key_t dev_key,
  *     connection will be terminated.
  */
 int 
-cc_of_destroy_channel(cc_ofchannel_key_t chann_id); /*noop for controller */
+cc_of_destroy_channel(uint64_t dp_id, 
+                      uint8_t aux_id); /*noop for controller */
 
 
 /**
@@ -149,7 +167,9 @@ cc_of_destroy_channel(cc_ofchannel_key_t chann_id); /*noop for controller */
  * Status
  */
 int
-cc_of_send_pkt(cc_ofchannel_key_t chann_id, void *of_msg, 
+cc_of_send_pkt(uint64_t dp_id, 
+               uint8_t aux_id, 
+               void *of_msg, 
                size_t msg_len);
 
 /**
@@ -163,8 +183,11 @@ cc_of_send_pkt(cc_ofchannel_key_t chann_id, void *of_msg,
  * Status
  */
 int
-cc_of_get_conn_stats(cc_ofchannel_key_t chann_id,
-cc_ofstats_t *stats);
+cc_of_get_conn_stats(uint64_t dp_id, 
+                     uint8_t aux_id,
+                     uint32_t *rx_pkt,
+                     uint32_t *tx_pkt,
+                     uint32_t *tx_drops);
 
 /**
  * cc_of_debug_toggle

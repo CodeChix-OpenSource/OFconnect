@@ -5,6 +5,7 @@
 #define CC_NET_CONN_H
 
 #include "cc_pollthr_mgr.h"
+#include "cc_of_lib.h"
 
 #define MAXBUF 65535
 /* Is this optimal? */
@@ -12,28 +13,6 @@
 typedef uint32_t ipaddr_v4_t;
 typedef ipaddr_v4_t ipaddr_v4v6_t;
 
-#ifndef L4_TYPE
-#define L4_TYPE
-typedef enum L4_type_ {
-    /* used for array index */
-    TCP = 0,
-    TLS,
-    UDP,
-    DTLS,
-    /* additional types here */ 
-    MAX_L4_TYPE
-} L4_type_e;
-#endif
-
-#ifndef CC_OFVER
-#define CC_OFVER
-typedef enum cc_ofver_ {
-    CC_OFVER_1_0   = 0,
-    CC_OFVER_1_3,
-    CC_OFVER_1_3_1,
-    MAX_OFVER_TYPE
-} cc_ofver_e;
-#endif
 
 typedef enum addr_type_ {
     IPV4,
@@ -54,9 +33,9 @@ typedef enum addr_type_ {
  * 01. This will be a callback. 
  *
  */
-typedef int (*cc_of_recv_pkt)(uint64_t dp_id, uint8_t aux_id,
+/*typedef int (*cc_of_recv_pkt)(uint64_t dp_id, uint8_t aux_id,
                               void *of_msg, 
-                              size_t of_msg_len);
+                              size_t of_msg_len);*/
 
 typedef struct cc_ofdev_key_ {
     ipaddr_v4v6_t  controller_ip_addr;

@@ -38,18 +38,13 @@ static const char * cc_of_errtable[] = {
 
 inline const char *cc_of_strerror(int errnum);
 
-#ifndef CC_OFVER
-#define CC_OFVER
 typedef enum cc_ofver_ {
     CC_OFVER_1_0   = 0,
     CC_OFVER_1_3,
     CC_OFVER_1_3_1,
     MAX_OFVER_TYPE
 } cc_ofver_e;
-#endif
 
-#ifndef L4_TYPE
-#define L4_TYPE
 typedef enum L4_type_ {
     /* used for array index */
     TCP = 0,
@@ -59,7 +54,6 @@ typedef enum L4_type_ {
     /* additional types here */ 
     MAX_L4_TYPE
 } L4_type_e;
-#endif
 
 typedef enum of_dev_type_ {
     SWITCH = 0,

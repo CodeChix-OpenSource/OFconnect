@@ -5,6 +5,7 @@
 #define CC_NET_CONN_H
 
 #include "cc_pollthr_mgr.h"
+#include "cc_of_lib.h"
 
 #define MAXBUF 65535
 /* Is this optimal? */
@@ -12,25 +13,6 @@
 typedef uint32_t ipaddr_v4_t;
 typedef ipaddr_v4_t ipaddr_v4v6_t;
 
-typedef enum L4_type_ {
-    /* used for array index */
-    TCP = 0,
-    TLS,
-    UDP,
-    DTLS,
-    /* additional types here */ 
-    MAX_L4_TYPE
-} L4_type_e;
-
-#ifndef CC_OFVER
-#define CC_OFVER
-typedef enum cc_ofver_ {
-    CC_OFVER_1_0   = 0,
-    CC_OFVER_1_3,
-    CC_OFVER_1_3_1,
-    MAX_OFVER_TYPE
-} cc_ofver_e;
-#endif
 
 typedef enum addr_type_ {
     IPV4,
@@ -51,9 +33,9 @@ typedef enum addr_type_ {
  * 01. This will be a callback. 
  *
  */
-typedef int (*cc_of_recv_pkt)(uint64_t dp_id, uint8_t aux_id,
+/*typedef int (*cc_of_recv_pkt)(uint64_t dp_id, uint8_t aux_id,
                               void *of_msg, 
-                              size_t of_msg_len);
+                              size_t of_msg_len);*/
 
 typedef struct cc_ofdev_key_ {
     ipaddr_v4v6_t  controller_ip_addr;
@@ -73,7 +55,7 @@ typedef struct cc_ofstats_ {
     uint32_t  tx_drops;
 } cc_ofstats_t;
 
-typedef struct cc_ofchann_info_ {
+typedef struct cc_ofchannel_info_ {
     int                   rw_sockfd;
     int                   count_retries; /* CLIENT: reconnection attempts */
     cc_ofstats_t          stats;    
@@ -86,7 +68,7 @@ typedef struct cc_ofdev_info_ {
     GList          *ofrw_socket_list; //list of rw sockets
     GMutex	       ofrw_socket_list_lock;
 
-    cc_of_recv_pkt       recv_func; /* cc_of_recv_pkt function ptr */
+    cc_of_recv_pkt recv_func; /* cc_of_recv_pkt function ptr */
 
     int            main_sockfd_tcp;
     int            main_sockfd_udp;
@@ -111,7 +93,7 @@ typedef struct cc_ofrw_info_ {
 } cc_ofrw_info_t;
 
 typedef struct net_svcs_ {
-    int (*open_clientfd)(cc_ofdev_key_t key);
+    int (*open_clientfd)(cc_ofdev_key_t key, cc_ofchannel_key_t ofchann_key);
     int (*open_serverfd)(cc_ofdev_key_t key);
     int (*accept_conn)(int listenfd, cc_ofdev_key_t key);
     int (*close_conn)(int sockfd);

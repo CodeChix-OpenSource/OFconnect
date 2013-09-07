@@ -85,8 +85,8 @@ gboolean cc_ofrw_htbl_equal_func(gconstpointer a, gconstpointer b)
 }
 
 
-int
-cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type)
+cc_of_ret
+cc_of_lib_init(of_dev_type_e dev_type)
 {
     cc_of_ret status = CC_OF_OK;
 
@@ -99,9 +99,7 @@ cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type)
                                      LOG_FILE_NAME_SIZE);
     g_mutex_init(&cc_of_global.oflog_lock);
     
-    cc_of_global.ofdrv_type = drv_type;
     cc_of_global.ofdev_type = dev_type;
-
     cc_of_global.ofdev_htbl = g_hash_table_new_full(g_direct_hash,
                                                     cc_ofdev_htbl_equal_func,
                                                     cc_of_destroy_generic,
@@ -167,9 +165,64 @@ cc_of_lib_init(of_dev_type_e dev_type, of_drv_type_e drv_type)
 }
 
 
+cc_of_ret
+cc_of_lib_free()
+{
+    cc_of_ret status = CC_OF_OK;
+    GList *elem;
 
-// TODO: switch case for switch
-int cc_of_dev_register(uint32_t controller_ipaddr, 
+    /* clear all globally allocated data */
+    g_free(cc_of_global.oflog_file);
+    fclose(cc_of_global.oflog_fd);
+    g_mutex_clear(&cc_of_global.oflog_lock);
+
+    if (cc_of_global.ofdev_htbl) {
+        GHashTableIter ofdev_iter;
+        cc_ofdev_key_t *dev_key;
+        cc_ofdev_info_t *dev_info;
+
+        g_hash_table_iter_init(&ofdev_iter, cc_of_global.ofdev_htbl);
+        if (g_hash_table_iter_next(&ofdev_iter, (gpointer *)&dev_key, 
+                                   (gpointer *)&dev_info)) {
+            status = cc_of_dev_free(dev_key->controller_ip_addr, 
+                                    dev_key->switch_ip_addr,
+                                    dev_key->controller_L4_port);
+            CC_LOG_ERROR("%s(%d): %s, Error while freeing a dev in ofdev_htbl",
+                         __FUNCTION__, __LINE__, cc_of_strerror(status));
+        }
+    }
+    g_mutex_clear(&cc_of_global.ofdev_htbl_lock);
+
+    /* Cleaning up all devices should have cleaned both
+     * ofchannel and ofrw htbls as well. But, cleanup again 
+     * if anything is remaining in these htbls.
+     */
+    if (cc_of_global.ofchannel_htbl) {
+        g_hash_table_destroy(cc_of_global.ofchannel_htbl);
+    }
+    g_mutex_clear(&cc_of_global.ofchannel_htbl_lock);
+
+    if (cc_of_global.ofrw_htbl) {
+        g_hash_table_destroy(cc_of_global.ofrw_htbl);
+    }
+    g_mutex_clear(&cc_of_global.ofrw_htbl_lock);
+
+    if (cc_of_global.oflisten_pollthr_p)
+        adp_thr_mgr_free(cc_of_global.oflisten_pollthr_p);
+
+    elem = cc_of_global.ofrw_pollthr_list;
+    while (elem != NULL) {
+        adp_thr_mgr_free((adpoll_thread_mgr_t *)elem->data);
+        elem = elem->next;
+    }
+    g_list_free_full(cc_of_global.ofrw_pollthr_list,
+                     cc_of_destroy_generic);
+
+    return CC_OF_OK;
+}
+
+
+cc_of_ret cc_of_dev_register(uint32_t controller_ipaddr, 
                        uint32_t switch_ipaddr, 
                        uint16_t controller_L4_port,
                        cc_ofver_e max_ofver, 
@@ -209,6 +262,7 @@ int cc_of_dev_register(uint32_t controller_ipaddr,
 	    status = CC_OF_ENOMEM;
 	    CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__,
                      cc_of_strerror(status));
+        g_free(key);
 	    return status;
     }
 
@@ -218,24 +272,31 @@ int cc_of_dev_register(uint32_t controller_ipaddr,
 
     dev_info->recv_func = recv_func;
 
-    // Create a TCP sockfd for tcp connections
-    dev_info->main_sockfd_tcp =
-        cc_of_global.NET_SVCS[TCP].open_serverfd(*key);
-    if (dev_info->main_sockfd_tcp < 0) {
-	    status = CC_OF_EMISC;
-	    CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__,
-                     cc_of_strerror(status));
-	    return status;
-    }
+    if (cc_of_global.ofdev_type == CONTROLLER) {
 
-    // Create a udp sockfd for udp connections
-    dev_info->main_sockfd_udp =
-        cc_of_global.NET_SVCS[UDP].open_serverfd(*key);
-    if (dev_info->main_sockfd_udp < 0) {
-	    status = CC_OF_EMISC;
-	    CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__,
-                     cc_of_strerror(status));
-	    return status;
+        // Create a TCP sockfd for tcp connections
+        dev_info->main_sockfd_tcp =
+            cc_of_global.NET_SVCS[TCP].open_serverfd(*key);
+        if (dev_info->main_sockfd_tcp < 0) {
+	        status = CC_OF_EMISC;
+	        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__,
+                         cc_of_strerror(status));
+            g_free(key);
+            g_free(dev_info);
+	        return status;
+        }
+
+        // Create a udp sockfd for udp connections
+        dev_info->main_sockfd_udp =
+            cc_of_global.NET_SVCS[UDP].open_serverfd(*key);
+        if (dev_info->main_sockfd_udp < 0) {
+	        status = CC_OF_EMISC;
+	        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__,
+                         cc_of_strerror(status));
+            g_free(key);
+            g_free(dev_info);
+	        return status;
+        }
     }
 
     // Add this new device entry to ofdev_htbl
@@ -249,6 +310,181 @@ int cc_of_dev_register(uint32_t controller_ipaddr,
 
     return status;
 }
+
+
+cc_of_ret
+cc_of_dev_free(uint32_t controller_ip_addr,
+               uint32_t switch_ip_addr,
+               uint16_t controller_L4_port)
+{
+    cc_of_ret status = CC_OF_OK;
+    cc_ofdev_key_t dev_key;
+    cc_ofdev_info_t *dev_info;
+    char switch_ip[INET_ADDRSTRLEN];
+    char controller_ip[INET_ADDRSTRLEN];
+    adpoll_thr_msg_t thr_msg;
+    GList *elem = NULL;
+    gboolean new_entry;
+
+    dev_key.controller_ip_addr = (ipaddr_v4v6_t)controller_ip_addr;
+    dev_key.switch_ip_addr = (ipaddr_v4v6_t)switch_ip_addr;
+    dev_key.controller_L4_port = (ipaddr_v4v6_t)controller_L4_port;
+
+    inet_ntop(AF_INET, &dev_key.switch_ip_addr, switch_ip, sizeof(switch_ip));
+    inet_ntop(AF_INET, &dev_key.controller_ip_addr, controller_ip, 
+              sizeof(controller_ip));
+
+    dev_info = g_hash_table_lookup(cc_of_global.ofdev_htbl, &dev_key);
+    if (dev_info == NULL) {
+        CC_LOG_ERROR("%s(%d):, could not find ofdev_info in ofdev_htbl"
+                     "for dev controller_ip-%s, switch_ip-%s,"
+                     "controller_l4_port-%hu",__FUNCTION__, __LINE__,
+                     controller_ip, switch_ip, controller_L4_port);
+        return CC_OF_EINVAL;
+    }
+
+    // close all ofchannels for this device
+    elem = dev_info->ofrw_socket_list;
+    while (elem != NULL) {
+        cc_ofrw_key_t rwkey;
+        cc_ofrw_info_t *rwinfo;
+
+        rwkey.rw_sockfd = *((int *)(elem->data));
+        rwinfo = g_hash_table_lookup(cc_of_global.ofrw_htbl, &rwkey);
+        if (rwinfo == NULL) {
+            CC_LOG_ERROR("%s(%d): could not find rwsockinfo in ofrw_htbl"
+                         "for sockfd-%d", __FUNCTION__, __LINE__, rwkey.rw_sockfd);
+            continue;
+        }
+        elem = elem->next;
+        status = cc_of_global.NET_SVCS[rwinfo->layer4_proto].close_conn(rwkey.rw_sockfd);
+        if (status < 0) {
+            CC_LOG_ERROR("%s(%d): %s, Error while closing ofchannel"
+                         "sockfd-%d", __FUNCTION__, __LINE__,
+                         cc_of_strerror(status), rwkey.rw_sockfd);
+        }
+    }
+    
+    // close main tcp listenfd and remove it from oflisten_pollthr.
+    // the main_sockfd_udp is part of ofrw_socket_list. It must be cleaned up already.
+    thr_msg.fd = dev_info->main_sockfd_tcp;
+    thr_msg.fd_type = SOCKET;
+    thr_msg.fd_action = DEL;
+
+    status = adp_thr_mgr_add_del_fd(cc_of_global.oflisten_pollthr_p, &thr_msg);
+    if (status < 0) {
+        CC_LOG_ERROR("%s(%d):Error deleting tcp_listenfd from oflisten_pollthr_p: %s",
+                     __FUNCTION__, __LINE__, cc_of_strerror(errno));
+    }
+    status = close(dev_info->main_sockfd_tcp);
+    if (status < 0) {
+        CC_LOG_ERROR("%s(%d):Error closing tcp_listenfd: %s",
+                     __FUNCTION__, __LINE__, strerror(errno));
+    }
+
+    // delete dev from devhtbl
+    status = update_global_htbl(OFDEV, DEL, &dev_key, NULL, &new_entry);
+    if (status < 0) {
+        CC_LOG_ERROR("%s(%d): %s, Error while freeing dev"
+                     "controller_ip-%s, switch_ip-%s,"
+                     "controller_l4_port-%hu",__FUNCTION__, __LINE__,
+                     cc_of_strerror(status), controller_ip, switch_ip, 
+                     controller_L4_port);
+        return status;
+    }
+
+    CC_LOG_INFO("%s(%d):, Devfree success for device"
+                 "controller_ip-%s, switch_ip-%s,"
+                 "controller_l4_port-%hu",__FUNCTION__, __LINE__,
+                 controller_ip, switch_ip, controller_L4_port);
+
+    return status;
+}
+
+
+cc_of_ret cc_of_create_channel(uint32_t controller_ip,
+                               uint32_t switch_ip,
+                               uint16_t controller_L4_port,
+                               uint64_t dp_id, 
+                               uint8_t aux_id,
+                               L4_type_e l4_proto)
+{
+   cc_of_ret status = CC_OF_OK;
+   cc_ofdev_key_t ofdev_key;
+   cc_ofchannel_key_t ofchann_key;
+   int rw_sockfd;
+   
+   if (l4_proto >= MAX_L4_TYPE) {
+        CC_LOG_ERROR("%s(%d): l4_proto is invalid", 
+                     __FUNCTION__, __LINE__);
+        return CC_OF_EINVAL;
+   }
+ 
+   ofdev_key.controller_ip_addr = (ipaddr_v4v6_t)controller_ip; 
+   ofdev_key.switch_ip_addr = (ipaddr_v4v6_t)switch_ip;
+   ofdev_key.controller_L4_port = controller_L4_port;
+
+   ofchann_key.dp_id = dp_id;
+   ofchann_key.aux_id = aux_id;
+
+   rw_sockfd = cc_of_global.NET_SVCS[l4_proto].open_clientfd(ofdev_key, ofchann_key);
+   if (rw_sockfd < 0) {
+       status = CC_OF_EMISC;
+       CC_LOG_ERROR("%s(%d): %s, Unable to create new ofchannel dp_id-%lu, aux_id-%u", 
+                    __FUNCTION__, __LINE__, cc_of_strerror(status), dp_id, aux_id);
+       return status;
+   }
+
+   CC_LOG_INFO("%s(%d):, created new ofchannel dp_id-%lu, aux_id-%u",
+                __FUNCTION__, __LINE__, dp_id, aux_id);
+
+   return status;
+}
+
+
+cc_of_ret
+cc_of_destroy_channel(uint64_t dp_id, uint8_t aux_id)
+{
+    cc_of_ret status = CC_OF_OK;
+    cc_ofchannel_key_t ofchann_key;
+    cc_ofchannel_info_t *ofchann_info;
+    cc_ofrw_key_t rwkey;
+    cc_ofrw_info_t *rwinfo = NULL;
+
+    ofchann_key.dp_id = dp_id;
+    ofchann_key.aux_id = aux_id;
+
+    ofchann_info = g_hash_table_lookup(cc_of_global.ofchannel_htbl, 
+                                       &ofchann_key);
+    if (ofchann_info == NULL) {
+        CC_LOG_ERROR("%s(%d):, could not find ofchann_info in ofchannel_htbl"
+                     "for key dp_id-%lu, aux_id-%u",__FUNCTION__, __LINE__, 
+                     dp_id, aux_id);
+        return CC_OF_EINVAL;
+    }
+
+    rwkey.rw_sockfd = ofchann_info->rw_sockfd;
+    rwinfo = g_hash_table_lookup(cc_of_global.ofrw_htbl, &rwkey);
+    if (rwinfo == NULL) {
+        CC_LOG_ERROR("%s(%d): could not find rwsockinfo in ofrw_htbl"
+                     "for sockfd-%d", __FUNCTION__, __LINE__, rwkey.rw_sockfd);
+        return CC_OF_EINVAL;
+    }
+
+    status = cc_of_global.NET_SVCS[rwinfo->layer4_proto].close_conn(ofchann_info->rw_sockfd);
+    if (status < 0) {
+        CC_LOG_ERROR("%s(%d): %s, Error while destroying ofchannel"
+                     "dp_id-%lu,aux_id-%u", __FUNCTION__, __LINE__, 
+                     cc_of_strerror(status), dp_id, aux_id);
+        return status;
+    }
+
+    CC_LOG_INFO("%s(%d):, destroyed ofchannel dp_id-%lu,aux_id-%u", 
+                 __FUNCTION__, __LINE__, dp_id, aux_id);
+
+    return status;
+}
+
 
 cc_of_ret
 cc_of_send_pkt(uint64_t dp_id, uint8_t aux_id, void *of_msg, 
@@ -290,6 +526,39 @@ cc_of_send_pkt(uint64_t dp_id, uint8_t aux_id, void *of_msg,
           msg_p, msg_p->hdr.msg_size);
     
     return CC_OF_OK;
+}
+
+
+cc_of_ret
+cc_of_set_real_dpid_auxid(uint64_t dummy_dpid, uint8_t dummy_auxid,
+                          uint64_t dp_id, uint8_t aux_id) 
+{
+    cc_of_ret status = CC_OF_OK;
+    cc_ofchannel_info_t *ofchann_info_old = NULL;
+    cc_ofchannel_info_t ofchann_info_new;
+    cc_ofchannel_key_t ofchann_key_old, ofchann_key_new;
+    gboolean new_entry;
+
+    ofchann_key_new.dp_id = dp_id;
+    ofchann_key_new.aux_id = aux_id;
+    ofchann_key_old.dp_id = dummy_dpid;
+    ofchann_key_old.aux_id = dummy_auxid;
+
+    ofchann_info_old = g_hash_table_lookup(cc_of_global.ofchannel_htbl, 
+                                       &ofchann_key_old);
+    if (ofchann_info_old == NULL) {
+        CC_LOG_ERROR("%s(%d):, could not find ofchann_info in ofchannel_htbl"
+                     "for key dummy_dpid-%lu, dummy_auxid-%u",__FUNCTION__, 
+                     __LINE__, dummy_dpid, dummy_auxid);
+        return CC_OF_EINVAL;
+    }
+
+    memcpy(&ofchann_info_new, ofchann_info_old, sizeof(cc_ofchannel_info_t));
+    status = del_ofchann_rwsocket((int)dummy_dpid);
+    update_global_htbl(OFCHANN, DEL, (gpointer)&ofchann_key_new, 
+                       &ofchann_info_new, &new_entry); 
+
+    return status;
 }
 
 
@@ -336,20 +605,4 @@ cc_of_log_clear()
     char clearlog[176];
     sprintf(clearlog, "cat /dev/null > %s", cc_of_global.oflog_file);
     system(clearlog);
-}
-
-int
-cc_of_lib_free()
-{
-    /* TODO: INCOMPLETE */
-    /* clear all globally allocated data */
-    g_free(cc_of_global.oflog_file);
-    fclose(cc_of_global.oflog_fd);
-    /*
-    g_mutex_clear(ofdev_htbl_lock;
-                  ofchannel_htbl_lock;
-                  ofrw_htbl_lock;
-                  oflog_lock;
-    */
-    return CC_OF_OK;
 }

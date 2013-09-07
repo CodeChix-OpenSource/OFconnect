@@ -50,6 +50,10 @@ cc_of_ret
 del_ofchann_rwsocket(int rwsock);
 
 cc_of_ret
+find_ofchann_key_rwsocket(int sockfd, 
+                          cc_ofchannel_key_t **fd_chann_key);
+
+cc_of_ret
 add_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock);
 
 cc_of_ret
@@ -59,7 +63,8 @@ cc_of_ret
 atomic_add_upd_htbls_with_rwsocket(int sockfd, 
                                    adpoll_thread_mgr_t  *thr_mgr,
                                    cc_ofdev_key_t key,
-                                   L4_type_e layer4_proto);
+                                   L4_type_e layer4_proto, 
+                                   cc_ofchannel_key_t ofchann_key);
 
 /* POLLTHR utilities */
 cc_of_ret
@@ -86,6 +91,7 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr,
 cc_of_ret
 cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *msg, 
                          cc_ofdev_key_t key, 
-                         L4_type_e layer4_proto);
+                         L4_type_e layer4_proto,
+                         cc_ofchannel_key_t ofchann_key);
 
 #endif //CC_OF_UTIL_H

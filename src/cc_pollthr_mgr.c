@@ -19,6 +19,22 @@ pollthr_data_pipe_process_func(char *tname,
                                adpoll_fd_info_t *data_p,
                                adpoll_send_msg_htbl_info_t *unused_data UNUSED);                               
 
+/* Utility functions */
+gint
+fdinfo_compare_fd(gconstpointer list_elem, gconstpointer compare_fd)
+{
+    adpoll_fd_info_t *list_elem_p = (adpoll_fd_info_t *)list_elem;
+    int fd = *(int *)compare_fd;
+    
+    if (list_elem_p->fd < fd) {
+        return -1;
+    } else if (list_elem_p->fd > fd) {
+        return 1;
+    } else {
+        return 0;
+    }
+    return 0;
+}
 adpoll_thread_mgr_t *
 adp_thr_mgr_new(char *tname,
                 uint32_t max_sockets,
@@ -142,7 +158,6 @@ void adp_thr_mgr_free(adpoll_thread_mgr_t *this)
  * The fd could be either a pipe or a network socket
  * return value: ADD_FD - the newly created wr pipe is returned
  *             : DELETE_FD - returns -1.
- * TODO (IMPORTANT): synchrnize this fn
  */
 int
 adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
@@ -292,7 +307,9 @@ adp_thr_mgr_add_del_fd(adpoll_thread_mgr_t *this,
     g_mutex_unlock((this->add_del_pipe_cv_mutex));
 
     if (self_destruct) {
-//        adp_thr_mgr_free(this); < DO NOT CALL THIS - causes deadlock as it triggers antoher self destruct
+        /* DO NOT CALL adp_thr_mgr_free here -
+         * causes deadlock as it triggers antoher self destruct
+         */
         return retval;
     }
 
@@ -325,7 +342,7 @@ poll_fd_process(adpoll_fd_info_t *data_p,
                 char *tname)
 {
     pollthr_private_t *thr_pvt_p = NULL;
-    adpoll_send_msg_htbl_key_t send_msg_key;
+    int send_msg_key_fd;
     adpoll_send_msg_htbl_info_t *send_msg_info;    
     
     thr_pvt_p = g_private_get(&tname_key);
@@ -348,25 +365,51 @@ poll_fd_process(adpoll_fd_info_t *data_p,
                      __FUNCTION__, __LINE__, data_p->pollfd_entry_p->fd);
         
         /* lookup hash table entry for this socket fd*/
-        send_msg_key.fd = data_p->fd;
+        send_msg_key_fd = data_p->pollfd_entry_p->fd;
 
         g_mutex_lock(&thr_pvt_p->send_msg_htbl_lock);
         
-        send_msg_info = g_hash_table_lookup(thr_pvt_p->send_msg_htbl,
-                                            (gpointer)&send_msg_key);
+        CC_LOG_DEBUG("fd key looked up in hash table: %d",
+                     send_msg_key_fd);
+
+        if(!g_hash_table_contains(thr_pvt_p->send_msg_htbl,
+                                  GINT_TO_POINTER (send_msg_key_fd))) {
+            CC_LOG_ERROR("%s(%d): hash table does not have fd %d; "
+                         "hash table size is %d", __FUNCTION__, __LINE__,
+                         send_msg_key_fd,
+                         g_hash_table_size(thr_pvt_p->send_msg_htbl));
+        }
+        
+        send_msg_info = g_hash_table_lookup(
+            thr_pvt_p->send_msg_htbl,
+            GINT_TO_POINTER (send_msg_key_fd));
+
+        g_assert(send_msg_info != NULL);
+        g_private_replace(&tname_key,
+                          (gpointer)thr_pvt_p);
+        
         if (data_p->pollout_func) {
             data_p->pollout_func(tname, data_p, send_msg_info);
         } else {
             CC_LOG_ERROR("%s(%d): No pollout function defined",
                          __FUNCTION__, __LINE__);
         }
+        
+        thr_pvt_p = g_private_get(&tname_key);        
+        
+        if (!g_hash_table_remove(thr_pvt_p->send_msg_htbl,
+                                 GINT_TO_POINTER (send_msg_key_fd))) {
+            CC_LOG_ERROR("%s(%d) htbl delete failed for fd %d",
+                         __FUNCTION__, __LINE__, send_msg_key_fd);
+        }
 
-
-        g_hash_table_remove(thr_pvt_p->send_msg_htbl,
-                            (gpointer)&send_msg_key);
-
-        /* if this is the last of the messages, reset pollout flag */
-        if (g_hash_table_size(thr_pvt_p->send_msg_htbl) == 0) {
+        /* if this is the last of the messages for this fd,
+         *  reset pollout flag */
+        if(!g_hash_table_contains(thr_pvt_p->send_msg_htbl,
+                                  GINT_TO_POINTER (send_msg_key_fd))) {
+            
+            CC_LOG_DEBUG("%s(%d): Resetting POLLOUT flag for fd %d",
+                         __FUNCTION__, __LINE__, send_msg_key_fd);
             data_p->pollfd_entry_p->events &= ~POLLOUT;
         }
         g_mutex_unlock(&thr_pvt_p->send_msg_htbl_lock);
@@ -379,9 +422,9 @@ poll_fd_process(adpoll_fd_info_t *data_p,
 static void
 print_fd_list(adpoll_fd_info_t *data_p)
 {
-    CC_LOG_INFO("fd: %d\tfd_type: %d\tpollin_func: %p\tpollout_func: %p",
+    CC_LOG_INFO("fd: %d\tfd_type: %d\tpollin_func: %p\tpollout_func: %p \tevents: %x",
                 data_p->fd, data_p->fd_type, data_p->pollin_func,
-                data_p->pollout_func);
+                data_p->pollout_func, data_p->pollfd_entry_p->events);
 }
 
 
@@ -419,7 +462,7 @@ pollthr_pri_pipe_process_func(char *tname,
       case ADD_FD:
       {
 
-          CC_LOG_DEBUG("%s(%d): pipe ADD %d of type %d of action %d",
+          CC_LOG_DEBUG("%s(%d): fd ADD %d of type %d of action %d",
                        __FUNCTION__, __LINE__, msg.fd, msg.fd_type,
                        msg.fd_action);
           fd_entry_p = (adpoll_fd_info_t *)malloc(sizeof(adpoll_fd_info_t));
@@ -461,86 +504,78 @@ pollthr_pri_pipe_process_func(char *tname,
       {
           gboolean found = FALSE;
           int del_index;
-          if (msg.fd_type == PIPE) {
-              CC_LOG_DEBUG("%s(%d): pipe DELETE", __FUNCTION__, __LINE__);
-
-              if ((msg.fd == thr_pvt_p->pollfd_arr[0].fd) ||
-                  (msg.fd == thr_pvt_p->pollfd_arr[1].fd)) {
-                  CC_LOG_DEBUG("%s(%d): Received DEL on primary pipe FD "
-                               "or data pipe FD - SELF DESTRUCT",
-                               __FUNCTION__, __LINE__);
-
-                  thr_pvt_p->num_pollfds = 0;
-                  
-                  g_private_replace(&tname_key,
-                                    (gpointer)thr_pvt_p);
-                  return;
-              } else {
-                  
-                  /* find and delete the pollfd entry */              
-                  for (i = 1; i < thr_pvt_p->num_pollfds; i++) {
-                      CC_LOG_DEBUG("%s(%d): thr_pvt pollfd iter %d is %d",
-                               __FUNCTION__, __LINE__, i,
-                                   thr_pvt_p->pollfd_arr[i].fd);
-                      if (msg.fd == thr_pvt_p->pollfd_arr[i].fd) {
-                          del_index = i;
-                          found = TRUE;
-                          break;
-                      }
-                  }
-                  if (found == TRUE) {
-                      CC_LOG_DEBUG("%s(%d): found fd in pollfd_arr",
-                                   __FUNCTION__, __LINE__);
-                      
-                      for (i = del_index + 1 ; i< thr_pvt_p->num_pollfds; i++) {
-                          thr_pvt_p->pollfd_arr[i-1].fd =
-                              thr_pvt_p->pollfd_arr[i].fd;
-                          
-                          thr_pvt_p->pollfd_arr[i-1].events =
-                              thr_pvt_p->pollfd_arr[i].events;
-                          
-                          thr_pvt_p->pollfd_arr[i-1].revents =
-                              thr_pvt_p->pollfd_arr[i].revents;
-                      }
-                      thr_pvt_p->num_pollfds--;
-                      
-                      CC_LOG_DEBUG(POLLFD_COUNT_LOG "after DELETE_FD",
-                                   __FUNCTION__, __LINE__, tname,
-                                   thr_pvt_p->num_pollfds);
-                      
-                      /* find and delete the list entry for this pipe fd */
-                      traverse = g_list_first(thr_pvt_p->fd_list);
-                      fd_entry_p = NULL;
-                      
-                      while (traverse != NULL) {
-                          if (((adpoll_fd_info_t *)(traverse->data))->fd == msg.fd) {
-                              fd_entry_p = (adpoll_fd_info_t *)(traverse->data);
-                              break;
-                          }
-                          traverse = g_list_next(traverse);
-                      }
-                      
-                      if (fd_entry_p) {
-                          thr_pvt_p->fd_list = g_list_remove(thr_pvt_p->fd_list,
-                                                             (gconstpointer) fd_entry_p);
-                      } else {
-                          
-                          CC_LOG_ERROR("%s(%d)[%s]: inconsistent database "
-                                       "- pollfd found but fd entry not in list",
-                                       __FUNCTION__, __LINE__, tname);
-                      }
-                      if(cc_of_global.ofut_enable) {
-                          CC_LOG_DEBUG(FD_LIST_COUNT_LOG "DELETE_FD", __FUNCTION__, __LINE__,
-                                       tname, g_list_length(thr_pvt_p->fd_list));
-                      }
-                  } else {
-                      CC_LOG_ERROR("%s(%d): NOT found fd in pollfd_arr",
-                                   __FUNCTION__, __LINE__);
+          CC_LOG_DEBUG("%s(%d): fd DELETE", __FUNCTION__, __LINE__);
+          
+          if ((msg.fd == thr_pvt_p->pollfd_arr[0].fd) ||
+              (msg.fd == thr_pvt_p->pollfd_arr[1].fd)) {
+              CC_LOG_DEBUG("%s(%d): Received DEL on primary pipe FD "
+                           "or data pipe FD - SELF DESTRUCT",
+                           __FUNCTION__, __LINE__);
+              
+              thr_pvt_p->num_pollfds = 0;
+              
+              g_private_replace(&tname_key,
+                                (gpointer)thr_pvt_p);
+              return;
+          } else {
+              
+              /* find and delete the pollfd entry */              
+              for (i = 1; i < thr_pvt_p->num_pollfds; i++) {
+                  if (msg.fd == thr_pvt_p->pollfd_arr[i].fd) {
+                      del_index = i;
+                      found = TRUE;
+                      break;
                   }
               }
-          } else {
-              /* socket delete processing */
-              //DHURKA - TODO
+              if (found == TRUE) {
+                  CC_LOG_DEBUG("%s(%d): found fd in pollfd_arr",
+                               __FUNCTION__, __LINE__);
+                  
+                  for (i = del_index + 1 ; i< thr_pvt_p->num_pollfds; i++) {
+                      thr_pvt_p->pollfd_arr[i-1].fd =
+                          thr_pvt_p->pollfd_arr[i].fd;
+                      
+                      thr_pvt_p->pollfd_arr[i-1].events =
+                          thr_pvt_p->pollfd_arr[i].events;
+                      
+                      thr_pvt_p->pollfd_arr[i-1].revents =
+                          thr_pvt_p->pollfd_arr[i].revents;
+                  }
+                  thr_pvt_p->num_pollfds--;
+                  
+                  CC_LOG_DEBUG(POLLFD_COUNT_LOG "after DELETE_FD",
+                               __FUNCTION__, __LINE__, tname,
+                               thr_pvt_p->num_pollfds);
+                  
+                  /* find and delete the list entry for this pipe fd */
+                  traverse = g_list_first(thr_pvt_p->fd_list);
+                  fd_entry_p = NULL;
+                  
+                  while (traverse != NULL) {
+                      if (((adpoll_fd_info_t *)(traverse->data))->fd == msg.fd) {
+                          fd_entry_p = (adpoll_fd_info_t *)(traverse->data);
+                          break;
+                      }
+                      traverse = g_list_next(traverse);
+                  }
+                  
+                  if (fd_entry_p) {
+                      thr_pvt_p->fd_list = g_list_remove(thr_pvt_p->fd_list,
+                                                         (gconstpointer) fd_entry_p);
+                  } else {
+                      
+                      CC_LOG_ERROR("%s(%d)[%s]: inconsistent database "
+                                   "- pollfd found but fd entry not in list",
+                                   __FUNCTION__, __LINE__, tname);
+                  }
+                  if(cc_of_global.ofut_enable) {
+                      CC_LOG_DEBUG(FD_LIST_COUNT_LOG "DELETE_FD", __FUNCTION__, __LINE__,
+                                   tname, g_list_length(thr_pvt_p->fd_list));
+                  }
+              } else {
+                  CC_LOG_ERROR("%s(%d): NOT found fd in pollfd_arr",
+                               __FUNCTION__, __LINE__);
+              }
           }
       }
       break;
@@ -565,14 +600,12 @@ pollthr_data_pipe_process_func(char *tname UNUSED,
     char msg_buf[SEND_MSG_BUF_SIZE];
     adpoll_send_msg_t *msg_p;
     struct pollfd *pollfd_entry_p;
-    adpoll_send_msg_htbl_key_t *send_msg_key;
+    int send_msg_key_fd;
     adpoll_send_msg_htbl_info_t *send_msg_info;
+    GList *rdfd_info_list = NULL;
+    adpoll_fd_info_t *rdfd_info;
+    int data_size;
 
-    send_msg_key =
-        (adpoll_send_msg_htbl_key_t *)malloc(sizeof(send_msg_key));
-    send_msg_info = 
-        (adpoll_send_msg_htbl_info_t *)malloc(sizeof(send_msg_info));
-    
     pollthr_private_t *thr_pvt_p = NULL;    
     thr_pvt_p = g_private_get(&tname_key);
     
@@ -583,20 +616,38 @@ pollthr_data_pipe_process_func(char *tname UNUSED,
                 __FUNCTION__, __LINE__,
                 msg_p->hdr.msg_size, msg_p->hdr.fd);
 
-    send_msg_key->fd = msg_p->hdr.fd;
-    send_msg_info->data_size =
-        msg_p->hdr.msg_size - sizeof(adpoll_send_msg_hdr_t);
-    g_memmove(send_msg_info->data, msg_p->data, send_msg_info->data_size);
-    
+    send_msg_key_fd = msg_p->hdr.fd;
+    data_size = msg_p->hdr.msg_size - sizeof(adpoll_send_msg_hdr_t);
+
+    send_msg_info = malloc(sizeof(adpoll_send_msg_htbl_info_t) + data_size);
+    send_msg_info->data_size = data_size;
+    g_memmove(send_msg_info->data, msg_p->data, data_size);
+
     /* add message to htbl */
     g_mutex_lock(&thr_pvt_p->send_msg_htbl_lock);
-    g_hash_table_insert(thr_pvt_p->send_msg_htbl,
-                        (gpointer)send_msg_key, 
-                        (gpointer)send_msg_info);
 
+    g_hash_table_insert(thr_pvt_p->send_msg_htbl,
+                        GINT_TO_POINTER(send_msg_key_fd),
+                        (gpointer)send_msg_info);
+    
     /* update POLLOUT flag on pollfd entry so it can be sent out */
-    pollfd_entry_p = data_p->pollfd_entry_p;
+    /* find the pollfd_entry_p of the send_msg_key->fd descriptor */
+    /* data_p->pollfd_entry_p is that of the data pipe!! */
+    rdfd_info_list =  g_list_find_custom(
+        thr_pvt_p->fd_list,
+        &send_msg_key_fd,
+        fdinfo_compare_fd);
+
+    g_assert(rdfd_info_list != NULL);
+    
+    rdfd_info = g_list_nth_data (rdfd_info_list, 0);
+
+    g_assert(rdfd_info != NULL);
+    
+    pollfd_entry_p = rdfd_info->pollfd_entry_p;
+
     g_assert(pollfd_entry_p != NULL);
+    
     pollfd_entry_p->events |= POLLOUT;
 
     g_mutex_unlock(&thr_pvt_p->send_msg_htbl_lock);
@@ -605,18 +656,16 @@ pollthr_data_pipe_process_func(char *tname UNUSED,
                       (gpointer)thr_pvt_p);
 }
 
-void func_destroy_key(gpointer data)
+void func_destroy_key(gpointer data UNUSED)
 {
-    g_free(data);
+    /* noop since we are using GINT_TO_POINTER */
+    return;
 }
 
 void func_destroy_val(gpointer data)
 {
-    adpoll_send_msg_htbl_info_t *send_msg_htbl_info_p;
-    send_msg_htbl_info_p = (adpoll_send_msg_htbl_info_t *)data;
-    
-    g_free(send_msg_htbl_info_p->data);    
-    g_free(data);
+    /* freeing of 'data' is sufficient to free the entire node */
+    free(data);
 }
 
 
@@ -636,7 +685,7 @@ adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p)
     adpoll_fd_info_t *fd_entry_p;
     pollthr_private_t *thr_pvt_p;
     char pollthr_name[MAX_NAME_LEN];
-    adpoll_thread_mgr_t *mgr = NULL;
+    GList *thr_pvt_fd_list = NULL;
 
     if (pollthr_data_p == NULL) {
         CC_LOG_FATAL("%s(%d): received NULL user data", __FUNCTION__, __LINE__);
@@ -664,7 +713,7 @@ adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p)
 
     g_mutex_init(&thr_pvt_p->send_msg_htbl_lock);
     thr_pvt_p->send_msg_htbl = g_hash_table_new_full(g_direct_hash,
-                                                     g_int_equal,
+                                                     g_direct_equal,
                                                      func_destroy_key,
                                                      func_destroy_val);
 
@@ -743,15 +792,25 @@ adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p)
             }
             break;
         } else {
-            g_list_foreach(thr_pvt_p->fd_list, (GFunc)poll_fd_process,
-                           (gpointer)pollthr_name);
+            thr_pvt_fd_list = thr_pvt_p->fd_list;
             
+            g_private_replace(&tname_key,
+                              (gpointer)thr_pvt_p);
+            
+            g_list_foreach(thr_pvt_fd_list, (GFunc)poll_fd_process,
+                           (gpointer)pollthr_name);
+
+            g_assert(pollthr_name != NULL);
             CC_LOG_DEBUG("%s(%d)[%s]: listing of updated GList",
                          __FUNCTION__, __LINE__, pollthr_name);
-            g_list_foreach(thr_pvt_p->fd_list, (GFunc)print_fd_list, NULL);
+
+            g_list_foreach(thr_pvt_fd_list, (GFunc)print_fd_list, NULL);
             CC_LOG_DEBUG("%s(%d)[%s]: listing %d items of updated pollfd_arr",
                          __FUNCTION__, __LINE__, pollthr_name,
                          thr_pvt_p->num_pollfds);
+            
+            thr_pvt_p = g_private_get(&tname_key);
+            thr_pvt_p->fd_list = thr_pvt_fd_list;
             for (i = 0; i < thr_pvt_p->num_pollfds; i++) {
                 CC_LOG_DEBUG("thr_pvt_p->pollfd_arr[%d].fd: %d, "
                              "thr_pvt_p->pollfd_arr[%d].events: %d",

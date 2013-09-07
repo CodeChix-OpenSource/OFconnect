@@ -10,10 +10,9 @@
 #include "cc_pollthr_mgr.h"
 
 #define SIZE_RW_THREAD_BUCKET        20
-/* Unused ?? */
-#define MAX_PER_THREAD_RWSOCKETS     200
-#define MAX_PIPE_PER_THR_MGR         0 /* no additional pipes */
 
+#define MAX_PER_THREAD_RWSOCKETS     200
+#define MAX_PER_THREAD_PIPES          0 /* no additional pipes */
 
 typedef struct cc_of_global_ {
     /* layer4 device type could be switch or controller */

@@ -142,7 +142,7 @@ cc_of_lib_init(of_dev_type_e dev_type)
 
     cc_of_global.oflisten_pollthr_p = adp_thr_mgr_new("oflisten_thr",
                                                       MAX_PER_THREAD_RWSOCKETS,
-                                                      MAX_PIPE_PER_THR_MGR);
+                                                      MAX_PER_THREAD_PIPES);
     if (cc_of_global.oflisten_pollthr_p == NULL) {
 	    status = CC_OF_EMISC;
 	    cc_of_lib_free();
@@ -151,9 +151,7 @@ cc_of_lib_init(of_dev_type_e dev_type)
     }
     cc_of_global.ofrw_pollthr_list = NULL;
 
-    if ((status = cc_create_rw_pollthr(NULL, 
-                                       MAX_PER_THREAD_RWSOCKETS, 
-                                       MAX_PIPE_PER_THR_MGR)) < 0) {
+    if ((status = cc_create_rw_pollthr(NULL)) < 0) {
 	    cc_of_lib_free();
 	    CC_LOG_FATAL("%s(%d): %s", __FUNCTION__, __LINE__, 
                      cc_of_strerror(status));

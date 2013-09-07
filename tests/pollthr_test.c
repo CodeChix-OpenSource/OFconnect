@@ -488,24 +488,6 @@ pollthread_tc_3(test_data_t *tdata,
     return;
 }
 
-#if 0
-    if (!fork()) {  /* child */
-        read(sv[1], &buf, 1);
-        printf("child: read '%c'\n", buf);
-        buf = toupper(buf);  /* make it uppercase */
-        write(sv[1], &buf, 1);
-        printf("child: sent '%c'\n", buf);
-        exit(0);
-    } else { /* parent */
-        write(sv[0], "b", 1);
-        printf("parent: sent 'b'\n");
-        read(sv[0], &buf, 1);
-        printf("parent: read '%c'\n", buf);
-        wait(NULL); /* wait for child to die */
-    }
-#endif
-
-
 void
 test_socket_out_process_func(char *tname,
                              adpoll_fd_info_t *data_p,
@@ -696,6 +678,9 @@ pollthread_tc_4(test_data_t *tdata,
 }
 
 #define SOCK_PATH "test_establish_socket"
+GMutex *sock_mutex;
+GCond  *sock_cond;
+int server_fd, accept_fd, connect_fd;
 
 void
 test_socket_listen_process_func(char *tname,
@@ -704,7 +689,8 @@ test_socket_listen_process_func(char *tname,
                                 *unused_data UNUSED)
 {
     struct sockaddr_un remote;
-    int accept_fd, t;
+//    int accept_fd;
+    int t;
     char str[100];
     char test_str[] = "hello 1..2..3..10..20..30";
 
@@ -725,13 +711,11 @@ test_socket_listen_process_func(char *tname,
     write(accept_fd, str, 100);
 }
 
-GMutex *sock_mutex;
-GCond  *sock_cond;
-
 gpointer
 connect_fd_thread_func(gpointer data_p UNUSED)
 {
-    int retval, connect_fd, len;
+    int retval, len;
+//    int connect_fd;
     struct sockaddr_un remote;
     char str[100];
     char test_str[] = "hello 1..2..3..10..20..30";
@@ -778,6 +762,9 @@ pollthread_tc_5(test_data_t *tdata,
     adpoll_thr_msg_t add_sock_msg;
     int wr_fd;
     GThread *child_thr = NULL;
+//    int server_fd;
+    int len, retval;
+    struct sockaddr_un local;
     
 //    cc_of_debug_toggle(TRUE);    //enable if debugging test code
 
@@ -791,13 +778,9 @@ pollthread_tc_5(test_data_t *tdata,
                                 NULL, TRUE, NULL);
     
     // socket()
-    //listen ()
-    //add_del_fd this listen fd with listen callback
+    // listen ()
+    // add_del_fd this listen fd with listen callback
     // send a test message from the callback
-    
-    int server_fd, len, retval;
-    struct sockaddr_un local;
-    
     server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     g_assert_cmpint(server_fd, !=, -1);
     
@@ -837,10 +820,12 @@ pollthread_tc_5(test_data_t *tdata,
     
     g_thread_join(child_thr);
     
-    
     adp_thr_mgr_free(&(tdata->tp_data));
     g_mutex_free(sock_mutex);
     g_cond_free(sock_cond);
+    close(server_fd);
+    close(accept_fd);
+    close(connect_fd);
 }
 
 int main(int argc, char **argv)

@@ -143,8 +143,9 @@ typedef struct adpoll_send_msg_htbl_key_ {
 } adpoll_send_msg_htbl_key_t;
 
 typedef struct adpoll_send_msg_htbl_info_ {
+//    struct pollfd     *pollfd_entry_p; /*poll struct of the rx fd */
     uint              data_size;
-    char               data[];
+    char              data[];
 } adpoll_send_msg_htbl_info_t;
 
 typedef struct adpoll_fd_info_ adpoll_fd_info_t;

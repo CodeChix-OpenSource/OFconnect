@@ -83,6 +83,33 @@ typedef int (*cc_of_recv_pkt)(uint64_t dp_id, uint8_t aux_id,
                               size_t of_msg_len);
 
 
+/**
+ * cc_of_accept
+ *
+ * Description:
+ * This callback function is called by the library everytime
+ * we accept a new connection. This is to notify the controller 
+ * that there is a new connection(of_channel).
+ *
+ * No-op for switch
+ *
+ * Returns:
+ * Status
+ *
+ * Notes:
+ * 01. This will be a callback. 
+ *
+ */
+typedef int (*cc_of_accept)(uint64_t dummy_dpid,
+                            uint8_t dummy_auxid,
+                            uint32_t controller_ip, /* Device on which we 
+                                                       got this new conn */
+                            uint32_t switch_ip,
+                            uint16_t controller_L4_port);
+
+
+
+
 
 /**
  * cc_of_lib_init
@@ -172,6 +199,29 @@ cc_of_send_pkt(uint64_t dp_id,
                uint8_t aux_id, 
                void *of_msg, 
                size_t msg_len);
+
+
+/**
+ * cc_of_get_real_dpid_auxid
+ * 
+ * Description:
+ * The controller has to call this function everytime it 
+ * establishes a new connection(of_channel). The controller 
+ * determines the dp_id/aux_id from the OFP_FEATURES_REQ packet 
+ * and notifies the id's to oflib library. Until then oflib 
+ * will be using a dummy dp_id/aux_id for the of_channel.
+ *
+ * No-op for switch
+ *
+ * Returns:
+ * Status
+ */
+cc_of_ret
+cc_of_set_real_dpid_auxid(uint64_t dummy_dpid,
+                          uint8_t dummy_auxid,
+                          uint64_t dp_id,
+                          uint8_t aux_id);
+
 
 /**
  * cc_of_get_conn_stats

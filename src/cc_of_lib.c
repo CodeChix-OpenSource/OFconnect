@@ -529,6 +529,39 @@ cc_of_send_pkt(uint64_t dp_id, uint8_t aux_id, void *of_msg,
 }
 
 
+cc_of_ret
+cc_of_set_real_dpid_auxid(uint64_t dummy_dpid, uint8_t dummy_auxid,
+                          uint64_t dp_id, uint8_t aux_id) 
+{
+    cc_of_ret status = CC_OF_OK;
+    cc_ofchannel_info_t *ofchann_info_old = NULL;
+    cc_ofchannel_info_t ofchann_info_new;
+    cc_ofchannel_key_t ofchann_key_old, ofchann_key_new;
+    gboolean new_entry;
+
+    ofchann_key_new.dp_id = dp_id;
+    ofchann_key_new.aux_id = aux_id;
+    ofchann_key_old.dp_id = dummy_dpid;
+    ofchann_key_old.aux_id = dummy_auxid;
+
+    ofchann_info_old = g_hash_table_lookup(cc_of_global.ofchannel_htbl, 
+                                       &ofchann_key_old);
+    if (ofchann_info_old == NULL) {
+        CC_LOG_ERROR("%s(%d):, could not find ofchann_info in ofchannel_htbl"
+                     "for key dummy_dpid-%lu, dummy_auxid-%u",__FUNCTION__, 
+                     __LINE__, dummy_dpid, dummy_auxid);
+        return CC_OF_EINVAL;
+    }
+
+    memcpy(&ofchann_info_new, ofchann_info_old, sizeof(cc_ofchannel_info_t));
+    status = del_ofchann_rwsocket((int)dummy_dpid);
+    update_global_htbl(OFCHANN, DEL, (gpointer)&ofchann_key_new, 
+                       &ofchann_info_new, &new_entry); 
+
+    return status;
+}
+
+
 void
 cc_of_debug_toggle(gboolean debug_on)
 {

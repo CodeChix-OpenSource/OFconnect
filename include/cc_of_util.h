@@ -66,21 +66,22 @@ atomic_add_upd_htbls_with_rwsocket(int sockfd,
                                    L4_type_e layer4_proto, 
                                    cc_ofchannel_key_t ofchann_key);
 
-/* POLLTHR utilities */
-cc_of_ret
-cc_create_rw_pollthr(adpoll_thread_mgr_t **tmgr,
-                     int32_t max_sockets,
-                     uint32_t max_pipes);
+/*-----------------------------------------------------------------------*/
+/* POLLTHR utilities                                                     */
+/* Utilities to manage the rw poll thr pool                              */
+/* Sorted list of rw pollthreads                                         */
+/* Sorted based on num available socket fds - largest availability first */
+/*-----------------------------------------------------------------------*/
 
+cc_of_ret
+cc_create_rw_pollthr(adpoll_thread_mgr_t **tmgr);
 
 guint
 cc_get_count_rw_pollthr(void);
 
 
 cc_of_ret
-cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t **tmgr,
-                            uint32_t max_sockets,
-                            uint32_t max_pipes);
+cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t **tmgr);
 
 
 cc_of_ret

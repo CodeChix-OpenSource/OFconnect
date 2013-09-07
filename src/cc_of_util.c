@@ -319,12 +319,12 @@ cc_get_count_rw_pollthr(void)
 }
 
 cc_of_ret
-cc_create_rw_pollthr(adpoll_thread_mgr_t **tmgr,
-                     int32_t max_sockets,
-                     uint32_t max_pipes)
+cc_create_rw_pollthr(adpoll_thread_mgr_t **tmgr)
 {
     adpoll_thread_mgr_t *tmgr_new = NULL;
     char tname[MAX_NAME_LEN];
+    int max_sockets = MAX_PER_THREAD_RWSOCKETS;
+    int max_pipes = MAX_PER_THREAD_PIPES;
 
     g_sprintf(tname,"rwthr_%3d", cc_get_count_rw_pollthr() + 1);
     
@@ -337,8 +337,9 @@ cc_create_rw_pollthr(adpoll_thread_mgr_t **tmgr,
     }
 
     /* update the global GList */
-    cc_of_global.ofrw_pollthr_list = g_list_prepend(cc_of_global.ofrw_pollthr_list,
-                                                    (gpointer)tmgr);
+    cc_of_global.ofrw_pollthr_list =
+        g_list_prepend(cc_of_global.ofrw_pollthr_list, (gpointer)tmgr);
+    
     CC_LOG_DEBUG("%s(%d): created new rw pollthr %s "
                  "total pollthr %d",
                  __FUNCTION__, __LINE__, tname,
@@ -351,16 +352,14 @@ cc_create_rw_pollthr(adpoll_thread_mgr_t **tmgr,
 
 
 cc_of_ret
-cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t **tmgr,
-			                 uint32_t max_sockets, /* used for create */
-                             uint32_t max_pipes) /* used for create */
+cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t **tmgr)
 {
     GList *elem, *next_elem;
 
     if (cc_get_count_rw_pollthr() == 0) {
         CC_LOG_DEBUG("%s(%d): no existing poll thr - create new",
                      __FUNCTION__, __LINE__);
-        return(cc_create_rw_pollthr(tmgr, max_sockets, max_pipes));
+        return(cc_create_rw_pollthr(tmgr));
     }    
 
     elem = g_list_first(cc_of_global.ofrw_pollthr_list);
@@ -371,7 +370,7 @@ cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t **tmgr,
         CC_LOG_DEBUG("%s(%d) - socket capacity exhausted. create new poll thr",
     /* TODO: Finish this impl */
                     __FUNCTION__, __LINE__);
-        return(cc_create_rw_pollthr(tmgr, max_sockets, max_pipes));
+        return(cc_create_rw_pollthr(tmgr));
     }    
         
     while (((next_elem = g_list_next(elem)) != NULL) &&
@@ -477,8 +476,8 @@ cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key,
     adpoll_thread_mgr_t *tmgr = NULL;
 
     /* find or create a poll thread */
-    status = cc_find_or_create_rw_pollthr(&tmgr, MAX_PER_THREAD_RWSOCKETS,
-                                          MAX_PIPE_PER_THR_MGR);
+    status = cc_find_or_create_rw_pollthr(&tmgr);
+
     if(status < 0) {
         CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
                      cc_of_strerror(status));

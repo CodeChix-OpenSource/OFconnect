@@ -28,6 +28,9 @@ DOCDIR  := $(CCDIR)/doc
 INCLUDES := -I$(CCDIR)/include
 SRCS     := $(wildcard $(SRCDIR)/*.c)
 OBJS     := $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCS))
+TESTSRCS := $(wildcard $(TESTDIR)/*.c)
+TESTOBJS := $(patsubst $(TESTDIR)/%.c,$(TESTDIR)/%.o,$(TESTSRCS))
+TESTPROGS:= $(patsubst $(TESTDIR)/%.c,$(TESTDIR)/%,$(TESTSRCS))
 
 
 # Mandatory requirement: GLib-2.0, pkg-config 0.26
@@ -42,7 +45,8 @@ LDFLAGS:= -shared -Wl,-soname,$(SONAME)
 TCFLAGS := $(shell pkg-config --cflags glib-2.0) \
 	$(INCLUDES) -Wall -Wextra -g 
 
-.PHONY: objects
+# make objects
+
 objects: $(OBJS)
 
 $(OBJS): | $(OBJDIR)
@@ -53,15 +57,10 @@ $(OBJDIR):
 $(OBJDIR)/%.o : $(SRCDIR)/%.c 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-.PHONY: dryrun
-dryrun:
-	@echo "$(MAKE)"
-	@echo "$(CC) $(CFLAGS)"
-	@echo "$(OBJS)"
-	@echo "$(SRCS)"
 
 
-.PHONY: all
+# make all
+
 all: $(REALNAME)
 
 $(REALNAME):$(OBJS)
@@ -73,6 +72,7 @@ $(REALNAME):$(OBJS)
 clean: 
 	$(RM) $(REALNAME) $(OBJS)
 	$(RM) -r $(OBJDIR)
+	$(RM) $(TESTOBJS) $(TESTPROGS)
 
 .PHONY: install
 #install needs sudo permissions
@@ -86,7 +86,20 @@ install:
 	ln -sf $(COMLIB)/$(SONAME) $(COMLIB)/$(LIBNAME)
 	cp $(INCLDIR)/cc_of_lib.h $(COMINCL)/
 
-.PHONY: test
-test: $(OBJS)
-	$(CC) -c tests/pollthr_test.c -o tests/pollthr_test.o $(TCFLAGS)
-	$(CC) $(OBJS) tests/pollthr_test.o -o tests/pollthr_test $(LIBS)
+
+
+$(TESTDIR)/%.o : $(TESTDIR)/%.c 
+	@echo  "in object creation"
+	$(CC) -c $< -o $@ $(TCFLAGS)
+
+
+$(TESTDIR)/% : $(TESTDIR)/%.o
+	@echo  "in final linking"
+	$(CC) $(OBJS) $< -o $@ $(LIBS)
+
+# make test
+test: $(TESTPROGS)
+
+$(TESTPROGS) : $(TESTOBJS)
+
+$(TESTOBJS) : $(OBJS)

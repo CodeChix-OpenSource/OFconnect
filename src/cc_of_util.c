@@ -282,8 +282,8 @@ atomic_add_upd_htbls_with_rwsocket(int sockfd, adpoll_thread_mgr_t  *thr_mgr,
     if (cc_of_global.ofdev_type == CONTROLLER) {
         cc_ofchannel_key_t controller_chann_key;
 
-        controller_chann_key.dp_id = sockfd;
-        controller_chann_key.aux_id = sockfd;
+        controller_chann_key.dp_id = (uint64_t)sockfd;
+        controller_chann_key.aux_id = (uint8_t)sockfd;
         if ((status = add_upd_ofchann_rwsocket(controller_chann_key, sockfd)) < 0) {
             CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
             del_ofdev_rwsocket(key, sockfd);

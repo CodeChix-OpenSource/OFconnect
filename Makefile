@@ -30,8 +30,9 @@ SRCS     := $(wildcard $(SRCDIR)/*.c)
 OBJS     := $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCS))
 TESTSRCS := $(wildcard $(TESTDIR)/*.c)
 TESTOBJS := $(patsubst $(TESTDIR)/%.c,$(TESTDIR)/%.o,$(TESTSRCS))
-TESTPROGS:= $(patsubst $(TESTDIR)/%.c,$(TESTDIR)/%,$(TESTSRCS))
-
+TESTPROGS:= $(patsubst $(TESTDIR)/%.c,$(TESTDIR)/%.exe,$(TESTSRCS))
+TESTXML  := $(patsubst $(TESTDIR)/%.c,$(TESTDIR)/log-%.xml,$(TESTSRCS))
+TESTHTML := $(patsubst $(TESTDIR)/%.c,$(TESTDIR)/log-%.html,$(TESTSRCS))
 
 # Mandatory requirement: GLib-2.0, pkg-config 0.26
 # Need to add a check for this later. Best place to do 
@@ -44,6 +45,20 @@ LDFLAGS:= -shared -Wl,-soname,$(SONAME)
 
 TCFLAGS := $(shell pkg-config --cflags glib-2.0) \
 	$(INCLUDES) -Wall -Wextra -g 
+
+
+.PHONY: help
+help:
+	@echo "make objects  : build library objects"
+	@echo "make all      : compile and link library"
+	@echo "make install  : install library"
+	@echo "                Needs root permissions"
+	@echo "make clean    : cleans all object files of library"
+	@echo "make test     : compile all tests"
+	@echo "make runtest  : execute all tests"
+	@echo "                Creates xml and html log files"
+	@echo "make cleantest: cleans all temporary test files"
+	@echo "                including log files"
 
 # make objects
 
@@ -89,12 +104,10 @@ install:
 
 
 $(TESTDIR)/%.o : $(TESTDIR)/%.c 
-	@echo  "in object creation"
 	$(CC) -c $< -o $@ $(TCFLAGS)
 
 
-$(TESTDIR)/% : $(TESTDIR)/%.o
-	@echo  "in final linking"
+$(TESTDIR)/%.exe : $(TESTDIR)/%.o
 	$(CC) $(OBJS) $< -o $@ $(LIBS)
 
 # make test
@@ -103,3 +116,29 @@ test: $(TESTPROGS)
 $(TESTPROGS) : $(TESTOBJS)
 
 $(TESTOBJS) : $(OBJS)
+
+
+$(TESTDIR)/log-%.xml : $(TESTDIR)/%.exe
+	@echo  "gtester"
+	gtester --verbose -o=$@ -k $<
+
+$(TESTDIR)/log-%.html : $(TESTDIR)/log-%.xml
+	@echo  "gtester"
+	#use sed to update the xml file
+	sed "\|</gtester>| i \
+	  <info>\
+	    <package>TEST PACKAGE</package>\
+	    <version>0</version>\
+	    <revision>1</revision>\
+	  </info>\
+	" --in-place='' $<
+	gtester-report $< > $@
+
+.PHONY : runtest
+runtest: $(TESTHTML)
+
+$(TESTHTML) : $(TESTXML)
+
+.PHONY : cleantest
+cleantest:
+	$(RM) $(TESTOBJS) $(TESTPROGS) $(TESTXML) $(TESTHTML)

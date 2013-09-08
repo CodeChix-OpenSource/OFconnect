@@ -378,7 +378,7 @@ cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t **tmgr)
         elem = next_elem;
     }
     
-    *tmgr = (adpoll_thread_mgr_t *)(elem);
+    *tmgr = (adpoll_thread_mgr_t *)(elem->data);
     
     return(CC_OF_OK);
 }

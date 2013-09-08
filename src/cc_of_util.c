@@ -326,8 +326,8 @@ cc_create_rw_pollthr(adpoll_thread_mgr_t **tmgr)
     int max_sockets = MAX_PER_THREAD_RWSOCKETS;
     int max_pipes = MAX_PER_THREAD_PIPES;
 
-    g_sprintf(tname,"rwthr_%3d", cc_get_count_rw_pollthr() + 1);
-    
+    g_sprintf(tname,"rwthr_%d", cc_get_count_rw_pollthr() + 1);
+
     tmgr_new = adp_thr_mgr_new(tname, max_sockets, max_pipes);
 
     if (tmgr_new == NULL) {
@@ -339,7 +339,6 @@ cc_create_rw_pollthr(adpoll_thread_mgr_t **tmgr)
     /* update the global GList */
     cc_of_global.ofrw_pollthr_list =
         g_list_prepend(cc_of_global.ofrw_pollthr_list, (gpointer)tmgr_new);
-    
     CC_LOG_DEBUG("%s(%d): created new rw pollthr %s "
                  "total pollthr %d",
                  __FUNCTION__, __LINE__, tname,

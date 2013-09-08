@@ -89,7 +89,9 @@ cc_of_ret
 cc_of_lib_init(of_dev_type_e dev_type)
 {
     cc_of_ret status = CC_OF_OK;
-
+    CC_LOG_DEBUG("%s(%d): %s", __FUNCTION__, __LINE__,
+                 "Started Registering OFLIB");
+ 
     // Initialize cc_of_global
     cc_of_global.ofdebug_enable = FALSE;
     cc_of_global.oflog_enable = FALSE;
@@ -150,13 +152,17 @@ cc_of_lib_init(of_dev_type_e dev_type)
                      cc_of_strerror(status));
     }
     cc_of_global.ofrw_pollthr_list = NULL;
-
-    if ((status = cc_create_rw_pollthr(NULL)) < 0) {
+    CC_LOG_DEBUG("%s(%d): %s", __FUNCTION__, __LINE__,
+                 "CREATED POLLTHR FOR listen sockets");
+   
+    adpoll_thread_mgr_t *tmgr = NULL;
+    if ((status = cc_create_rw_pollthr(&tmgr)) < 0) {
 	    cc_of_lib_free();
 	    CC_LOG_FATAL("%s(%d): %s", __FUNCTION__, __LINE__, 
                      cc_of_strerror(status));
     }
-    
+    CC_LOG_DEBUG("%s(%d): %s", __FUNCTION__, __LINE__,
+                 "CREATED POLLTHR FOR rwsockets");
     CC_LOG_INFO("%s(%d): %s", __FUNCTION__, __LINE__,
                 "CC_OF_Library initilaized successfully");
     return status;
@@ -221,10 +227,10 @@ cc_of_lib_free()
 
 
 cc_of_ret cc_of_dev_register(uint32_t controller_ipaddr, 
-                       uint32_t switch_ipaddr, 
-                       uint16_t controller_L4_port,
-                       cc_ofver_e max_ofver, 
-                       cc_of_recv_pkt recv_func) {
+                             uint32_t switch_ipaddr, 
+                             uint16_t controller_L4_port,
+                             cc_ofver_e max_ofver, 
+                             cc_of_recv_pkt recv_func) {
     cc_of_ret status = CC_OF_OK;
     cc_ofdev_key_t *key;
     cc_ofdev_info_t *dev_info;
@@ -233,6 +239,9 @@ cc_of_ret cc_of_dev_register(uint32_t controller_ipaddr,
     ipaddr_v4v6_t controller_ip_addr = (ipaddr_v4v6_t)controller_ipaddr;
     ipaddr_v4v6_t switch_ip_addr = (ipaddr_v4v6_t)switch_ipaddr;
 
+    CC_LOG_DEBUG("%s(%d): %s", __FUNCTION__, __LINE__,
+                 "Started Registering Device");
+ 
     if (max_ofver >= MAX_OFVER_TYPE) {
         CC_LOG_ERROR("%s(%d): max openflow version invalid", 
                      __FUNCTION__, __LINE__);
@@ -283,7 +292,9 @@ cc_of_ret cc_of_dev_register(uint32_t controller_ipaddr,
             g_free(dev_info);
 	        return status;
         }
-
+        CC_LOG_DEBUG("%s(%d): %s", __FUNCTION__, __LINE__,
+                 "Created TCP listenfd");
+ 
         // Create a udp sockfd for udp connections
         dev_info->main_sockfd_udp =
             cc_of_global.NET_SVCS[UDP].open_serverfd(*key);
@@ -295,6 +306,9 @@ cc_of_ret cc_of_dev_register(uint32_t controller_ipaddr,
             g_free(dev_info);
 	        return status;
         }
+        CC_LOG_DEBUG("%s(%d): %s", __FUNCTION__, __LINE__,
+                 "Created UDP serverfd");
+ 
     }
 
     // Add this new device entry to ofdev_htbl

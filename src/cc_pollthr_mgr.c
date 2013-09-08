@@ -92,7 +92,8 @@ adp_thr_mgr_new(char *tname,
     thread_user_data->primary_pipe_rd_fd = this->pipes_arr[PRI_PIPE_RD_FD];
 
     thread_user_data->mgr = this;
-    
+    CC_LOG_DEBUG("%s(%d): tname is %s", __FUNCTION__, __LINE__,
+                 thread_user_data->tname);
     this->thread_p = g_thread_new(this->tname,
                             (GThreadFunc) adp_thr_mgr_poll_thread_func,
                             thread_user_data);
@@ -468,8 +469,9 @@ pollthr_pri_pipe_process_func(char *tname,
           fd_entry_p = (adpoll_fd_info_t *)malloc(sizeof(adpoll_fd_info_t));
           fd_entry_p->fd = msg.fd;
           fd_entry_p->fd_type = msg.fd_type;
-
+            
           fd_entry_p->pollin_func = msg.pollin_func;
+        
           fd_entry_p->pollout_func = msg.pollout_func;
 
           /* access and modify the polling thread's pollfd array */

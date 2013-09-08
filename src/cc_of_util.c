@@ -338,8 +338,7 @@ cc_create_rw_pollthr(adpoll_thread_mgr_t **tmgr)
 
     /* update the global GList */
     cc_of_global.ofrw_pollthr_list =
-        g_list_append(cc_of_global.ofrw_pollthr_list, tmgr_new);
-    
+        g_list_prepend(cc_of_global.ofrw_pollthr_list, (gpointer)tmgr_new);
     CC_LOG_DEBUG("%s(%d): created new rw pollthr %s "
                  "total pollthr %d",
                  __FUNCTION__, __LINE__, tname,

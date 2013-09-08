@@ -175,6 +175,9 @@ cc_of_lib_free()
     cc_of_ret status = CC_OF_OK;
     GList *elem;
 
+    CC_LOG_DEBUG("%s(%d): %s", __FUNCTION__, __LINE__,
+                 "Started Freeing OFLIB");
+ 
     /* clear all globally allocated data */
     g_free(cc_of_global.oflog_file);
     fclose(cc_of_global.oflog_fd);

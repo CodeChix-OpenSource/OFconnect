@@ -6,6 +6,105 @@
 /* Utilities to manage the global hash tables                            */
 /*-----------------------------------------------------------------------*/
 
+
+guint cc_ofdev_hash_func(gconstpointer key)
+{
+    cc_ofdev_key_t *dev_key;
+    guint hash = 0;
+
+    dev_key = (cc_ofdev_key_t *)key;
+    hash = dev_key->controller_ip_addr + dev_key->switch_ip_addr +
+           dev_key->controller_L4_port;
+    hash = (hash * 2654435761) % MAX_OFDEV_HTBL_SIZE;
+    return hash;
+}
+
+guint cc_ofchann_hash_func(gconstpointer key)
+{
+    cc_ofchannel_key_t *ofchann_key;
+    guint hash = 0;
+
+    ofchann_key = (cc_ofchannel_key_t *)key;
+    hash = ofchann_key->dp_id + ofchann_key->aux_id;
+    hash = (hash * 2654435761) % MAX_OFCHANN_HTBL_SIZE;
+    return hash;
+}
+
+guint cc_ofrw_hash_func(gconstpointer key)
+{
+    cc_ofrw_key_t *ofrw_key;
+    guint hash = 0;
+
+    ofrw_key = (cc_ofrw_key_t *)key;
+    hash = ofrw_key->rw_sockfd;
+    hash = (hash * 2654435761) % MAX_OFRW_HTBL_SIZE;
+    return hash;
+}
+
+gboolean cc_ofdev_htbl_equal_func(gconstpointer a, gconstpointer b)
+{
+    cc_ofdev_key_t *a_dev, *b_dev;
+    a_dev = (cc_ofdev_key_t *)a;
+    b_dev = (cc_ofdev_key_t *)b;
+
+    if ((a_dev->controller_ip_addr == b_dev->controller_ip_addr) && 
+	    (a_dev->switch_ip_addr == b_dev->switch_ip_addr) &&
+        (a_dev->controller_L4_port == b_dev->controller_L4_port)) {
+	    return TRUE;
+    } else {
+	    return FALSE;
+    }
+}
+
+void cc_of_destroy_generic(gpointer data)
+{
+    g_free(data);
+}
+
+void cc_ofdev_htbl_destroy_val(gpointer data)
+{
+    cc_ofdev_info_t *dev_info_p;
+    dev_info_p = (cc_ofdev_info_t *)data;
+    g_mutex_lock(&dev_info_p->ofrw_socket_list_lock);
+    g_list_free_full(dev_info_p->ofrw_socket_list,
+                     cc_of_destroy_generic);
+    g_mutex_unlock(&dev_info_p->ofrw_socket_list_lock);
+    
+    g_mutex_clear(&dev_info_p->ofrw_socket_list_lock);
+    
+    g_free(data);
+}
+
+
+gboolean cc_ofchannel_htbl_equal_func(gconstpointer a, gconstpointer b)
+{
+    cc_ofchannel_key_t *a_chan, *b_chan;
+    a_chan = (cc_ofchannel_key_t *)a;
+    b_chan = (cc_ofchannel_key_t *)b;
+
+    if ((a_chan->dp_id == b_chan->dp_id) &&
+        (a_chan->aux_id == b_chan->aux_id)) {
+         return TRUE;
+     } else {
+         return FALSE;
+    }
+}
+
+
+gboolean cc_ofrw_htbl_equal_func(gconstpointer a, gconstpointer b)
+{
+    cc_ofrw_key_t *a_rw, *b_rw;
+    a_rw = (cc_ofrw_key_t *)a;
+    b_rw = (cc_ofrw_key_t *)b;
+
+    if (a_rw->rw_sockfd == b_rw->rw_sockfd) {
+	    return TRUE;
+    } else {
+	    return FALSE;
+    }
+}
+
+    
 cc_of_ret
 update_global_htbl(htbl_type_e htbl_type,
                    htbl_update_ops_e htbl_op,

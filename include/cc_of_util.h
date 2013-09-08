@@ -14,6 +14,11 @@
 #endif
 
 /* HTBL utilities */
+
+#define MAX_OFRW_HTBL_SIZE 10007
+#define MAX_OFCHANN_HTBL_SIZE 10007
+#define MAX_OFDEV_HTBL_SIZE 101
+
 typedef enum htbl_update_ops_ {
     ADD,
     DEL
@@ -24,6 +29,25 @@ typedef enum htbl_type_ {
     OFRW,
     OFCHANN
 } htbl_type_e;
+
+guint cc_ofdev_hash_func(gconstpointer key);
+
+guint cc_ofchann_hash_func(gconstpointer key);
+
+guint cc_ofrw_hash_func(gconstpointer key);
+
+void cc_of_destroy_generic(gpointer data);
+
+void cc_ofdev_htbl_destroy_val(gpointer data);
+
+gboolean cc_ofdev_htbl_equal_func(gconstpointer a, 
+                                  gconstpointer b);
+
+gboolean cc_ofchannel_htbl_equal_func(gconstpointer a, 
+                                      gconstpointer b);
+
+gboolean cc_ofrw_htbl_equal_func(gconstpointer a, 
+                                 gconstpointer b);
 
 cc_of_ret
 update_global_htbl(htbl_type_e htbl_type,

@@ -19,24 +19,6 @@ typedef enum addr_type_ {
     IPV6
 } addr_type_e;
 
-/**
- * cc_of_recv_pkt
- *
- * Description:
- * This callback function is called by the library when a packet is received
- * from the socket.
- *
- * Returns:
- * Status
- *
- * Notes:
- * 01. This will be a callback. 
- *
- */
-/*typedef int (*cc_of_recv_pkt)(uint64_t dp_id, uint8_t aux_id,
-                              void *of_msg, 
-                              size_t of_msg_len);*/
-
 typedef struct cc_ofdev_key_ {
     ipaddr_v4v6_t  controller_ip_addr;
     ipaddr_v4v6_t  switch_ip_addr; 

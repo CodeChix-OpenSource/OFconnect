@@ -21,70 +21,6 @@ inline const char *cc_of_strerror(int errnum)
 }
 
 
-gboolean cc_ofdev_htbl_equal_func(gconstpointer a, gconstpointer b)
-{
-    cc_ofdev_key_t *a_dev, *b_dev;
-    a_dev = (cc_ofdev_key_t *)a;
-    b_dev = (cc_ofdev_key_t *)b;
-
-    if ((a_dev->controller_ip_addr == b_dev->controller_ip_addr) && 
-	    (a_dev->switch_ip_addr == b_dev->switch_ip_addr) &&
-        (a_dev->controller_L4_port == b_dev->controller_L4_port)) {
-	    return TRUE;
-    } else {
-	    return FALSE;
-    }
-}
-
-void cc_of_destroy_generic(gpointer data)
-{
-    g_free(data);
-}
-
-void cc_ofdev_htbl_destroy_val(gpointer data)
-{
-    cc_ofdev_info_t *dev_info_p;
-    dev_info_p = (cc_ofdev_info_t *)data;
-    g_mutex_lock(&dev_info_p->ofrw_socket_list_lock);
-    g_list_free_full(dev_info_p->ofrw_socket_list,
-                     cc_of_destroy_generic);
-    g_mutex_unlock(&dev_info_p->ofrw_socket_list_lock);
-    
-    g_mutex_clear(&dev_info_p->ofrw_socket_list_lock);
-    
-    g_free(data);
-}
-
-
-gboolean cc_ofchannel_htbl_equal_func(gconstpointer a, gconstpointer b)
-{
-    cc_ofchannel_key_t *a_chan, *b_chan;
-    a_chan = (cc_ofchannel_key_t *)a;
-    b_chan = (cc_ofchannel_key_t *)b;
-
-    if ((a_chan->dp_id == b_chan->dp_id) &&
-        (a_chan->aux_id == b_chan->aux_id)) {
-         return TRUE;
-     } else {
-         return FALSE;
-    }
-}
-
-
-gboolean cc_ofrw_htbl_equal_func(gconstpointer a, gconstpointer b)
-{
-    cc_ofrw_key_t *a_rw, *b_rw;
-    a_rw = (cc_ofrw_key_t *)a;
-    b_rw = (cc_ofrw_key_t *)b;
-
-    if (a_rw->rw_sockfd == b_rw->rw_sockfd) {
-	    return TRUE;
-    } else {
-	    return FALSE;
-    }
-}
-
-
 cc_of_ret
 cc_of_lib_init(of_dev_type_e dev_type)
 {
@@ -102,7 +38,7 @@ cc_of_lib_init(of_dev_type_e dev_type)
     g_mutex_init(&cc_of_global.oflog_lock);
     
     cc_of_global.ofdev_type = dev_type;
-    cc_of_global.ofdev_htbl = g_hash_table_new_full(g_direct_hash,
+    cc_of_global.ofdev_htbl = g_hash_table_new_full(cc_ofdev_hash_func,
                                                     cc_ofdev_htbl_equal_func,
                                                     cc_of_destroy_generic,
                                                     cc_ofdev_htbl_destroy_val);
@@ -114,7 +50,7 @@ cc_of_lib_init(of_dev_type_e dev_type)
     }
     g_mutex_init(&cc_of_global.ofdev_htbl_lock);
 
-    cc_of_global.ofchannel_htbl = g_hash_table_new_full(g_direct_hash,
+    cc_of_global.ofchannel_htbl = g_hash_table_new_full(cc_ofchann_hash_func,
                                                         cc_ofchannel_htbl_equal_func,
                                                         cc_of_destroy_generic,
                                                         cc_of_destroy_generic);
@@ -126,7 +62,7 @@ cc_of_lib_init(of_dev_type_e dev_type)
     }
     g_mutex_init(&cc_of_global.ofchannel_htbl_lock);
 
-    cc_of_global.ofrw_htbl = g_hash_table_new_full(g_direct_hash,
+    cc_of_global.ofrw_htbl = g_hash_table_new_full(cc_ofrw_hash_func,
                                                    cc_ofrw_htbl_equal_func,
                                                    cc_of_destroy_generic,
                                                    cc_of_destroy_generic);
@@ -174,6 +110,9 @@ cc_of_lib_free()
 {
     cc_of_ret status = CC_OF_OK;
     GList *elem;
+
+    CC_LOG_DEBUG("%s(%d): %s", __FUNCTION__, __LINE__,
+                 "Started Freeing OFLIB");
 
     if (cc_of_global.ofdev_htbl) {
         GHashTableIter ofdev_iter;

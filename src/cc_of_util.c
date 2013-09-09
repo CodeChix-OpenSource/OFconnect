@@ -487,8 +487,11 @@ cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key,
 	    adp_thr_mgr_add_del_fd(tmgr, thr_msg);
 	
 	    /* add fd to global structures */
-	    status = atomic_add_upd_htbls_with_rwsocket(thr_msg->fd, tmgr, key, 
-                                                        layer4_proto, ofchann_key);
+	    status = atomic_add_upd_htbls_with_rwsocket(thr_msg->fd,
+                                                        tmgr,
+                                                        key, 
+                                                        layer4_proto,
+                                                        ofchann_key);
 	    if (status < 0) {
 	        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
                          cc_of_strerror(status));

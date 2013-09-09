@@ -12,6 +12,7 @@
 #define SIZE_RW_THREAD_BUCKET        20
 
 #define MAX_PER_THREAD_RWSOCKETS     200
+
 #define MAX_PER_THREAD_PIPES          0 /* no additional pipes */
 
 typedef struct cc_of_global_ {

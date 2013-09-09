@@ -175,11 +175,6 @@ cc_of_lib_free()
     cc_of_ret status = CC_OF_OK;
     GList *elem;
 
-    /* clear all globally allocated data */
-    g_free(cc_of_global.oflog_file);
-    fclose(cc_of_global.oflog_fd);
-    g_mutex_clear(&cc_of_global.oflog_lock);
-
     if (cc_of_global.ofdev_htbl) {
         GHashTableIter ofdev_iter;
         cc_ofdev_key_t *dev_key;
@@ -195,12 +190,14 @@ cc_of_lib_free()
                          __FUNCTION__, __LINE__, cc_of_strerror(status));
         }
     }
+
     g_mutex_clear(&cc_of_global.ofdev_htbl_lock);
 
     /* Cleaning up all devices should have cleaned both
      * ofchannel and ofrw htbls as well. But, cleanup again 
      * if anything is remaining in these htbls.
      */
+
     if (cc_of_global.ofchannel_htbl) {
         g_hash_table_destroy(cc_of_global.ofchannel_htbl);
     }
@@ -214,7 +211,7 @@ cc_of_lib_free()
     if (cc_of_global.oflisten_pollthr_p)
         adp_thr_mgr_free(cc_of_global.oflisten_pollthr_p);
 
-    elem = cc_of_global.ofrw_pollthr_list;
+    elem = g_list_first(cc_of_global.ofrw_pollthr_list);
     while (elem != NULL) {
         adp_thr_mgr_free((adpoll_thread_mgr_t *)elem->data);
         elem = elem->next;
@@ -222,6 +219,10 @@ cc_of_lib_free()
     g_list_free_full(cc_of_global.ofrw_pollthr_list,
                      cc_of_destroy_generic);
 
+    /* clear the logging last */
+    cc_of_log_toggle(FALSE);
+    free(cc_of_global.oflog_file);
+    g_mutex_clear(&cc_of_global.oflog_lock);
     return CC_OF_OK;
 }
 
@@ -589,14 +590,19 @@ void
 cc_of_log_toggle(gboolean logging_on)
 {
     g_mutex_lock(&cc_of_global.oflog_lock);
+    if (cc_of_global.oflog_enable == logging_on)  {
+        /* do nothing */
+        g_mutex_unlock(&cc_of_global.oflog_lock);
+        return;
+    }
     if (logging_on == TRUE) {
-        cc_of_global.oflog_fd =
+         cc_of_global.oflog_fd =
             create_logfile(cc_of_global.oflog_file);
     } else {
         fclose(cc_of_global.oflog_fd);
     }
     cc_of_global.oflog_enable = logging_on;
-    g_mutex_unlock(&cc_of_global.oflog_lock);    
+    g_mutex_unlock(&cc_of_global.oflog_lock);
 }
     
 char *

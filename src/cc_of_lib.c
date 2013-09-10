@@ -168,7 +168,8 @@ cc_of_lib_free()
 }
 
 
-cc_of_ret cc_of_dev_register(uint32_t controller_ipaddr, 
+cc_of_ret
+cc_of_dev_register(uint32_t controller_ipaddr, 
                              uint32_t switch_ipaddr, 
                              uint16_t controller_L4_port,
                              cc_ofver_e max_ofver, 
@@ -299,7 +300,7 @@ cc_of_dev_free(uint32_t controller_ip_addr,
     adpoll_thr_msg_t thr_msg;
     GList *elem = NULL;
     gboolean new_entry;
-    adpoll_thread_mgr_t *tmgr = NULL;
+//    adpoll_thread_mgr_t *tmgr = NULL;
 
     dkey = g_malloc0(sizeof(cc_ofdev_key_t));    
     dkey->controller_ip_addr = controller_ip_addr;
@@ -359,14 +360,17 @@ cc_of_dev_free(uint32_t controller_ip_addr,
     while (elem != NULL) {
         cc_ofrw_key_t rwkey;
         cc_ofrw_info_t *rwinfo;
-        gpointer rwht_key, rwht_info;
+        gpointer rwht_key = NULL, rwht_info = NULL;
 
         rwkey.rw_sockfd = *((int *)(elem->data));
         CC_LOG_DEBUG("%s %d here....here", __FUNCTION__, __LINE__);
         CC_LOG_DEBUG("rw sockfd found: %d", rwkey.rw_sockfd);
 
         if (g_hash_table_lookup_extended(cc_of_global.ofrw_htbl, &rwkey,
-                                         rwht_key, rwht_info) == FALSE);
+                                         rwht_key, rwht_info) == FALSE) {
+            CC_LOG_ERROR("%s(%d): ofrw lookup failed", __FUNCTION__,
+                         __LINE__);
+        }
         
         rwinfo = (cc_ofrw_info_t *)rwht_info;
         if (rwinfo == NULL) {
@@ -495,7 +499,8 @@ cc_of_destroy_channel(uint64_t dp_id, uint8_t aux_id)
     cc_ofchannel_info_t *ofchann_info;
     cc_ofrw_key_t rwkey;
     cc_ofrw_info_t *rwinfo = NULL;
-    gpointer chht_key, chht_info, rwht_key, rwht_info;
+    gpointer chht_key = NULL, chht_info = NULL;
+    gpointer rwht_key = NULL, rwht_info = NULL;
 
     ofchann_key.dp_id = dp_id;
     ofchann_key.aux_id = aux_id;
@@ -545,7 +550,7 @@ cc_of_send_pkt(uint64_t dp_id, uint8_t aux_id, void *of_msg,
     adpoll_send_msg_t  *msg_p;
     msg_p = (adpoll_send_msg_t *)SEND_MSG_BUF;
     cc_ofchannel_key_t chann_id;
-    gpointer chht_key, chht_info;
+    gpointer chht_key = NULL, chht_info = NULL;
 
     chann_id.dp_id = dp_id;
     chann_id.aux_id = aux_id;
@@ -559,10 +564,11 @@ cc_of_send_pkt(uint64_t dp_id, uint8_t aux_id, void *of_msg,
     if (g_hash_table_lookup_extended(cc_of_global.ofchannel_htbl,
                                      (gconstpointer)&chann_id,
                                      chht_key, chht_info) == FALSE) {
-        CC_LOG_ERROR("%s(%d): channel %lu/%lu not found", __FUNCTION__,
-                     __LINE__, chann_id.dp_id, chann_id.aux_id);
+        CC_LOG_ERROR("%s(%d): channel %d/%d not found", __FUNCTION__,
+                     __LINE__, (int)chann_id.dp_id,
+                     (int)chann_id.aux_id);
     }
-    chann_info = (cc_ofchannel_key_t *)chht_info;
+    chann_info = (cc_ofchannel_info_t *)chht_info;
     send_rwsock = chann_info->rw_sockfd;
 
     find_thrmgr_rwsocket(send_rwsock, &tmgr);
@@ -593,7 +599,7 @@ cc_of_set_real_dpid_auxid(uint64_t dummy_dpid, uint8_t dummy_auxid,
     cc_ofchannel_info_t ofchann_info_new;
     cc_ofchannel_key_t ofchann_key_old, ofchann_key_new;
     gboolean new_entry;
-    gpointer chht_key, chht_info;
+    gpointer chht_key = NULL, chht_info = NULL;
 
     ofchann_key_new.dp_id = dp_id;
     ofchann_key_new.aux_id = aux_id;

@@ -30,9 +30,9 @@ net_svcs_t tcp_sockfns = {
 extern net_svcs_t tcp_sockfns;
 
 
-static void process_listenfd_pollin_func(char *tname UNUSED,
-                                         adpoll_fd_info_t *data_p,
-                                         adpoll_send_msg_htbl_info_t *unused_data UNUSED)
+void process_listenfd_pollin_func(char *tname UNUSED,
+                                  adpoll_fd_info_t *data_p,
+                                  adpoll_send_msg_htbl_info_t *unused_data UNUSED)
 {
     int listenfd;    
 
@@ -63,9 +63,9 @@ static void process_listenfd_pollin_func(char *tname UNUSED,
 }
 
 
-static void process_tcpfd_pollin_func(char *tname UNUSED,
-                                      adpoll_fd_info_t *data_p,
-                                      adpoll_send_msg_htbl_info_t *unused_data UNUSED)
+void process_tcpfd_pollin_func(char *tname UNUSED,
+                               adpoll_fd_info_t *data_p,
+                               adpoll_send_msg_htbl_info_t *unused_data UNUSED)
 {
     char buf[MAXBUF]; /* Allocate buf to read data */
     ssize_t read_len = 0;
@@ -124,9 +124,9 @@ static void process_tcpfd_pollin_func(char *tname UNUSED,
 }
 
 
-static void process_tcpfd_pollout_func(char *tname UNUSED,
-                                       adpoll_fd_info_t *data_p,
-                                       adpoll_send_msg_htbl_info_t *send_msg_p)
+void process_tcpfd_pollout_func(char *tname UNUSED,
+                                adpoll_fd_info_t *data_p,
+                                adpoll_send_msg_htbl_info_t *send_msg_p)
 {
     int tcp_sockfd = 0;
 

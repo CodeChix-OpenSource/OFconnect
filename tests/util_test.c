@@ -14,6 +14,8 @@
 #include "cc_of_global.h"
 #include "cc_log.h"
 #include "cc_of_lib.h"
+#include "cc_tcp_conn.h"
+#include "cc_udp_conn.h"
 
 
 #ifndef UNUSED
@@ -57,6 +59,7 @@ util_start(test_data_t *tdata,
 {
     adpoll_thread_mgr_t *temp_mgr_p = NULL;
     char *temp_liblog = NULL;
+    cc_of_ret status;
 
     // Initialize cc_of_global
     cc_of_global.ofut_enable = TRUE;
@@ -66,8 +69,12 @@ util_start(test_data_t *tdata,
     cc_of_debug_toggle(TRUE);    //enable if debugging test code
     cc_of_log_toggle(TRUE);
     g_mutex_init(&cc_of_global.oflog_lock);
-
+    g_mutex_init(&cc_of_global.ofdev_htbl_lock);
+    g_mutex_init(&cc_of_global.ofchannel_htbl_lock);
+    g_mutex_init(&cc_of_global.ofrw_htbl_lock);
+    
     cc_of_global.oflisten_pollthr_p = NULL;
+    cc_of_global.ofrw_pollthr_list = NULL;
     
     cc_of_global.ofdev_type = CONTROLLER;
     cc_of_global.ofdev_htbl = g_hash_table_new_full(cc_ofdev_hash_func,
@@ -75,14 +82,14 @@ util_start(test_data_t *tdata,
                                                     cc_of_destroy_generic,
                                                     cc_ofdev_htbl_destroy_val);
     g_assert(cc_of_global.ofdev_htbl != NULL);
-    g_mutex_init(&cc_of_global.ofdev_htbl_lock);
+
 
     cc_of_global.ofchannel_htbl = g_hash_table_new_full(cc_ofchann_hash_func,
                                                         cc_ofchannel_htbl_equal_func,
                                                         cc_of_destroy_generic,
                                                         cc_of_destroy_generic);
     g_assert(cc_of_global.ofdev_htbl != NULL);
-    g_mutex_init(&cc_of_global.ofchannel_htbl_lock);
+
 
     cc_of_global.ofrw_htbl = g_hash_table_new_full(cc_ofrw_hash_func,
                                                    cc_ofrw_htbl_equal_func,
@@ -91,11 +98,6 @@ util_start(test_data_t *tdata,
 
     g_assert (cc_of_global.ofdev_htbl != NULL);
 
-    g_mutex_init(&cc_of_global.ofrw_htbl_lock);
-
-    cc_of_global.ofrw_pollthr_list = NULL;
-    CC_LOG_DEBUG("%s(%d): %s", __FUNCTION__, __LINE__,
-                 "CREATED POLLTHR FOR listen sockets");
    
     cc_of_log_clear();
     cc_create_rw_pollthr(&temp_mgr_p);
@@ -103,6 +105,19 @@ util_start(test_data_t *tdata,
     
     g_memmove(&tdata->tp_data[0], temp_mgr_p, sizeof(adpoll_thread_mgr_t));
 
+    cc_of_global.NET_SVCS[TCP] = tcp_sockfns;
+    cc_of_global.NET_SVCS[UDP] = udp_sockfns;
+
+    cc_of_global.oflisten_pollthr_p = adp_thr_mgr_new("oflisten_thr",
+                                                      MAX_PER_THREAD_RWSOCKETS,
+                                                      MAX_PER_THREAD_PIPES);
+    if (cc_of_global.oflisten_pollthr_p == NULL) {
+	    status = CC_OF_EMISC;
+	    cc_of_lib_free();
+	    CC_LOG_FATAL("%s(%d): %s", __FUNCTION__, __LINE__,
+                     cc_of_strerror(status));
+    }
+   
     temp_liblog = cc_of_log_read();
     
     if (temp_liblog) {
@@ -336,6 +351,8 @@ util_tc_2(test_data_t *tdata, gconstpointer tudata)
 
     g_rand_free(random_gen);
 }
+
+//create listen thread in t
 
 
 

@@ -228,6 +228,9 @@ cc_of_ret tcp_open_listenfd(cc_ofdev_key_t key)
     struct sockaddr_in serveraddr;
     adpoll_thr_msg_t thr_msg;
 
+    CC_LOG_DEBUG("%s(%d): Starting to open listen fd %d",
+                 __FUNCTION__, __LINE__, key.controller_L4_port);
+    
     if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
     	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
 	    return listenfd;
@@ -250,6 +253,8 @@ cc_of_ret tcp_open_listenfd(cc_ofdev_key_t key)
 	    CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
 	    return status;
     }
+    CC_LOG_DEBUG("%s(%d): listen fd established: %d",
+                 __FUNCTION__, __LINE__, listenfd);
 
     if ((status = listen(listenfd, LISTENQ)) < 0) {
 	    CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));

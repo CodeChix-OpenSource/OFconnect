@@ -9,6 +9,9 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <sys/un.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "cc_of_util.h"
 #include "cc_of_global.h"
@@ -37,6 +40,15 @@ extern
 void cc_of_destroy_generic(gpointer data);
 extern
 void cc_ofdev_htbl_destroy_val(gpointer data);
+
+extern
+void process_tcpfd_pollin_func(char *tname,
+                               adpoll_fd_info_t *data_p,
+                               adpoll_send_msg_htbl_info_t *unused_data);
+extern
+void process_tcpfd_pollout_func(char *tname,
+                                adpoll_fd_info_t *data_p,
+                                adpoll_send_msg_htbl_info_t *send_msg_p);
 
 
 /* Fixture data */
@@ -90,7 +102,7 @@ util_start(test_data_t *tdata,
                                                         cc_ofchannel_htbl_equal_func,
                                                         cc_of_destroy_generic,
                                                         cc_of_destroy_generic);
-    g_assert(cc_of_global.ofdev_htbl != NULL);
+    g_assert(cc_of_global.ofchannel_htbl != NULL);
 
 
     cc_of_global.ofrw_htbl = g_hash_table_new_full(cc_ofrw_hash_func,
@@ -98,7 +110,7 @@ util_start(test_data_t *tdata,
                                                    cc_of_destroy_generic,
                                                    cc_of_destroy_generic);
 
-    g_assert (cc_of_global.ofdev_htbl != NULL);
+    g_assert (cc_of_global.ofrw_htbl != NULL);
 
    
     cc_of_log_clear();
@@ -290,6 +302,8 @@ int dummy_recv_func(uint64_t dp_id UNUSED,
     return 1;
 }
 
+#define TCPCLIENT 1
+
 // test cc_find_or_create_rw_pollthr
 // cc_del_sockfd_rw_pollthr and cc_add_sockfd_rw_pollthr
 // add MAX_PER_THREAD_RWSOCKETS - 1 fds - total threads: 1
@@ -319,7 +333,7 @@ util_tc_2(test_data_t *tdata, gconstpointer tudata)
     /* device setup */
     /* ip address 127.0.0.1 */
     devkey.controller_ip_addr = 0x7F000001;
-    devkey.switch_ip_addr = 0x0;
+    devkey.switch_ip_addr = 0x7F000001;
     devkey.controller_L4_port = 6633;
 
     retval = cc_of_dev_register(devkey.controller_ip_addr,
@@ -336,6 +350,79 @@ util_tc_2(test_data_t *tdata, gconstpointer tudata)
     /* init random number generator */
     random_gen = g_rand_new();    
 
+   //start a connection and try to connect with listen fd
+   //socket(); connect() - use the code in cc_tcp_conn
+    
+#ifdef TCPCLIENT
+    {
+    int clientfd;
+    cc_of_ret client_status = CC_OF_OK;
+    int optval = 1;
+    struct sockaddr_in serveraddr, localaddr;
+    cc_ofchannel_key_t ofchann_key;
+
+    ofchann_key.dp_id = 101001000;
+    ofchann_key.aux_id = 0;
+
+
+    if ((clientfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__,
+                     strerror(errno));
+    }
+
+    CC_LOG_DEBUG("%s(%d): NEW CLIENT SOCKET %d",
+                 __FUNCTION__, __LINE__, clientfd);
+
+    // To prevent "Address already in use" error from bind
+    if ((client_status = setsockopt(clientfd, SOL_SOCKET,SO_REUSEADDR, 
+                             (const void *)&optval, sizeof(int))) < 0) {
+        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
+                     strerror(errno));
+    }
+    memset(&localaddr, 0, sizeof(localaddr));
+    localaddr.sin_family = AF_INET;
+    localaddr.sin_addr.s_addr = htonl(devkey.switch_ip_addr);
+    localaddr.sin_port = 0;
+    
+    // Bind clienfd to a local interface addr
+    if ((client_status = bind(clientfd, (struct sockaddr *) &localaddr, 
+                       sizeof(localaddr))) < 0) {
+	    CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
+    }
+ 
+    memset(&serveraddr, 0, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(devkey.controller_ip_addr);
+    serveraddr.sin_port = htons(devkey.controller_L4_port);
+
+    // Establish connection with server
+    if ((client_status = connect(clientfd, (struct sockaddr *) &serveraddr, 
+                                 sizeof(serveraddr))) < 0) {
+        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
+    }
+    
+    // Add clientfd to a thr_mgr and update it in ofrw, ofdev htbls
+    adpoll_thr_msg_t thr_msg;
+
+    thr_msg.fd = clientfd;
+    thr_msg.fd_type = SOCKET;
+    thr_msg.fd_action = ADD;
+    thr_msg.poll_events = POLLIN | POLLOUT;
+    thr_msg.pollin_func = &process_tcpfd_pollin_func;
+    thr_msg.pollout_func = &process_tcpfd_pollout_func;
+    
+    client_status = cc_add_sockfd_rw_pollthr(&thr_msg, devkey, TCP, ofchann_key);
+    if (client_status < 0) {
+        CC_LOG_ERROR("%s(%d):Error updating tcp sockfd in global structures: %s",
+                     __FUNCTION__, __LINE__, cc_of_strerror(errno));
+        close(clientfd);
+    }
+    
+    }
+    #endif
+    
+    #if 0
+    
     /* create one unique dummy fd */
     while (!fd_is_unique(testfd_arr, num_fds,
                          (dummy_fd = g_rand_int_range(random_gen, 1, 1001))));
@@ -350,6 +437,7 @@ util_tc_2(test_data_t *tdata, gconstpointer tudata)
     retval = cc_add_sockfd_rw_pollthr(&add_fd_msg, devkey, TCP, chankey);
 
     g_test_message("retval from add_sockfd_rw_pollthr is CC_OF_OK");
+    #endif
     g_assert(retval == CC_OF_OK);
 
     g_rand_free(random_gen);

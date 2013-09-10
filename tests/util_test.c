@@ -24,7 +24,7 @@
 
 #define MAX_TEST_POLLTHR_LIST_SIZE 10
 
-extern cc_of_global_t cc_of_global;
+//extern cc_of_global_t cc_of_global;
 extern
 gboolean cc_ofrw_htbl_equal_func(gconstpointer a, gconstpointer b);
 extern
@@ -70,21 +70,21 @@ util_start(test_data_t *tdata,
     cc_of_global.oflisten_pollthr_p = NULL;
     
     cc_of_global.ofdev_type = CONTROLLER;
-    cc_of_global.ofdev_htbl = g_hash_table_new_full(g_direct_hash,
+    cc_of_global.ofdev_htbl = g_hash_table_new_full(cc_ofdev_hash_func,
                                                     cc_ofdev_htbl_equal_func,
                                                     cc_of_destroy_generic,
                                                     cc_ofdev_htbl_destroy_val);
     g_assert(cc_of_global.ofdev_htbl != NULL);
     g_mutex_init(&cc_of_global.ofdev_htbl_lock);
 
-    cc_of_global.ofchannel_htbl = g_hash_table_new_full(g_direct_hash,
+    cc_of_global.ofchannel_htbl = g_hash_table_new_full(cc_ofchann_hash_func,
                                                         cc_ofchannel_htbl_equal_func,
                                                         cc_of_destroy_generic,
                                                         cc_of_destroy_generic);
     g_assert(cc_of_global.ofdev_htbl != NULL);
     g_mutex_init(&cc_of_global.ofchannel_htbl_lock);
 
-    cc_of_global.ofrw_htbl = g_hash_table_new_full(g_direct_hash,
+    cc_of_global.ofrw_htbl = g_hash_table_new_full(cc_ofrw_hash_func,
                                                    cc_ofrw_htbl_equal_func,
                                                    cc_of_destroy_generic,
                                                    cc_of_destroy_generic);
@@ -328,7 +328,9 @@ util_tc_2(test_data_t *tdata, gconstpointer tudata)
     chankey.dp_id = dummy_fd;
     add_fd_msg.fd = dummy_fd;
 
+    print_ofdev_htbl();
     retval = cc_add_sockfd_rw_pollthr(&add_fd_msg, devkey, TCP, chankey);
+
     g_test_message("retval from add_sockfd_rw_pollthr is CC_OF_OK");
     g_assert(retval == CC_OF_OK);
 
@@ -1043,10 +1045,10 @@ int main(int argc, char **argv)
 {
     g_test_init(&argc, &argv, NULL);
 
-    g_test_add("/util/tc_1",
-               test_data_t,
-               "rwthr_1",
-               util_start, util_tc_1, util_end);
+//    g_test_add("/util/tc_1",
+//               test_data_t,
+//               "rwthr_1",
+//               util_start, util_tc_1, util_end);
 
     g_test_add("/util/tc_2",
                test_data_t,

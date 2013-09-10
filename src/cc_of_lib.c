@@ -125,8 +125,10 @@ cc_of_lib_free()
             status = cc_of_dev_free(dev_key->controller_ip_addr, 
                                     dev_key->switch_ip_addr,
                                     dev_key->controller_L4_port);
-            CC_LOG_ERROR("%s(%d): %s, Error while freeing a dev in ofdev_htbl",
-                         __FUNCTION__, __LINE__, cc_of_strerror(status));
+            if (status < 0) {
+                CC_LOG_ERROR("%s(%d): %s, Error while freeing a dev in ofdev_htbl",
+                             __FUNCTION__, __LINE__, cc_of_strerror(status));
+            }
         }
     }
 
@@ -173,6 +175,7 @@ cc_of_ret cc_of_dev_register(uint32_t controller_ipaddr,
                              cc_of_recv_pkt recv_func) {
     cc_of_ret status = CC_OF_OK;
     cc_ofdev_key_t *key;
+    gpointer ht_dev_key, ht_dev_info;
     cc_ofdev_info_t *dev_info;
     char switch_ip[INET_ADDRSTRLEN];
     char controller_ip[INET_ADDRSTRLEN]; 
@@ -206,11 +209,11 @@ cc_of_ret cc_of_dev_register(uint32_t controller_ipaddr,
     
     dev_info = g_malloc0(sizeof(cc_ofdev_info_t));
     if (dev_info == NULL) {
-	    status = CC_OF_ENOMEM;
-	    CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__,
+        status = CC_OF_ENOMEM;
+        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__,
                      cc_of_strerror(status));
         g_free(key);
-	    return status;
+        return status;
     }
 
     dev_info->of_max_ver = max_ofver;
@@ -219,6 +222,7 @@ cc_of_ret cc_of_dev_register(uint32_t controller_ipaddr,
 
     dev_info->recv_func = recv_func;
 
+    #if NOTYET
     if (cc_of_global.ofdev_type == CONTROLLER) {
 
         // Create a TCP sockfd for tcp connections
@@ -250,10 +254,27 @@ cc_of_ret cc_of_dev_register(uint32_t controller_ipaddr,
                  "Created UDP serverfd");
  
     }
+    #endif
 
     // Add this new device entry to ofdev_htbl
     g_hash_table_insert(cc_of_global.ofdev_htbl, (gpointer)key, 
                         (gpointer)dev_info);
+
+
+    if (g_hash_table_lookup_extended(cc_of_global.ofdev_htbl,
+                                     key,
+                                     &ht_dev_key,
+                                     &ht_dev_info) == FALSE) {
+        CC_LOG_ERROR("%s(%d): lookup returned FALSE", __FUNCTION__,
+                     __LINE__);
+    } else {
+        g_assert(ht_dev_key != NULL);
+        g_assert(ht_dev_info != NULL);
+        
+        CC_LOG_DEBUG("%s(%d): actual key returned 0x%x ip address",
+                     __FUNCTION__, __LINE__,
+                     ((cc_ofdev_key_t *)ht_dev_key)->controller_ip_addr);
+    }
 
     CC_LOG_INFO("%s(%d): %s , controllerIP:%s, switchIP:%s,"
                 "controllerPort:%hu",__FUNCTION__, __LINE__, 
@@ -270,24 +291,54 @@ cc_of_dev_free(uint32_t controller_ip_addr,
                uint16_t controller_L4_port)
 {
     cc_of_ret status = CC_OF_OK;
-    cc_ofdev_key_t dev_key;
-    cc_ofdev_info_t *dev_info;
+    cc_ofdev_key_t *dkey, *ht_dkey = NULL;
+    gpointer ht_dev_key, ht_dev_info;
+    cc_ofdev_info_t *ht_dinfo = NULL;
     char switch_ip[INET_ADDRSTRLEN];
     char controller_ip[INET_ADDRSTRLEN];
     adpoll_thr_msg_t thr_msg;
     GList *elem = NULL;
     gboolean new_entry;
+#ifndef NOTYET
+    adpoll_thread_mgr_t *tmgr = NULL;
+#endif
 
-    dev_key.controller_ip_addr = (ipaddr_v4v6_t)controller_ip_addr;
-    dev_key.switch_ip_addr = (ipaddr_v4v6_t)switch_ip_addr;
-    dev_key.controller_L4_port = (ipaddr_v4v6_t)controller_L4_port;
+    dkey = g_malloc0(sizeof(cc_ofdev_key_t));    
+    dkey->controller_ip_addr = controller_ip_addr;
+    dkey->switch_ip_addr = switch_ip_addr;
+    dkey->controller_L4_port = controller_L4_port;
 
-    inet_ntop(AF_INET, &dev_key.switch_ip_addr, switch_ip, sizeof(switch_ip));
-    inet_ntop(AF_INET, &dev_key.controller_ip_addr, controller_ip, 
+    inet_ntop(AF_INET, &dkey->switch_ip_addr, switch_ip, sizeof(switch_ip));
+    inet_ntop(AF_INET, &dkey->controller_ip_addr, controller_ip, 
               sizeof(controller_ip));
 
-    dev_info = g_hash_table_lookup(cc_of_global.ofdev_htbl, &dev_key);
-    if (dev_info == NULL) {
+    g_assert(g_hash_table_size(cc_of_global.ofdev_htbl) == 1);
+    print_ofdev_htbl();
+    
+
+    g_assert(g_hash_table_contains(cc_of_global.ofdev_htbl,
+                                   dkey) == TRUE);
+
+    CC_LOG_DEBUG("%s(%d): looking up "
+                 "controller_ip-0x%x, switch_ip-0x%x,"
+                 "controller_l4_port-%d",__FUNCTION__, __LINE__,
+                 dkey->controller_ip_addr,
+                 dkey->switch_ip_addr,
+                 dkey->controller_L4_port);
+
+    print_ofdev_htbl();    
+    if (g_hash_table_lookup_extended(cc_of_global.ofdev_htbl,
+                                     dkey,
+                                     &ht_dev_key,
+                                     &ht_dev_info) == FALSE) {
+        if (ht_dev_key != NULL) {
+            CC_LOG_DEBUG("act dev key controller ip is 0x%x",
+                         ((cc_ofdev_key_t *)ht_dev_key)->controller_ip_addr);
+        }
+        CC_LOG_ERROR("%s(%d): lookup returned FALSE", __FUNCTION__,
+                     __LINE__);
+    }
+    if (ht_dev_info == NULL) {
         CC_LOG_ERROR("%s(%d):, could not find ofdev_info in ofdev_htbl"
                      "for dev controller_ip-%s, switch_ip-%s,"
                      "controller_l4_port-%hu",__FUNCTION__, __LINE__,
@@ -295,13 +346,26 @@ cc_of_dev_free(uint32_t controller_ip_addr,
         return CC_OF_EINVAL;
     }
 
+
+    ht_dkey = (cc_ofdev_key_t *)ht_dev_key;
+    ht_dinfo = (cc_ofdev_info_t *)ht_dev_info;
+
+
+
     // close all ofchannels for this device
-    elem = dev_info->ofrw_socket_list;
+    elem = g_list_first(ht_dinfo->ofrw_socket_list);
+    if (elem == NULL) {
+        CC_LOG_DEBUG("%s(%d): no sockets in ofrw socket list", __FUNCTION__, __LINE__);
+    }
+
     while (elem != NULL) {
         cc_ofrw_key_t rwkey;
         cc_ofrw_info_t *rwinfo;
 
         rwkey.rw_sockfd = *((int *)(elem->data));
+        CC_LOG_DEBUG("%s %d here....here", __FUNCTION__, __LINE__);
+        CC_LOG_DEBUG("rw sockfd found: %d", rwkey.rw_sockfd);
+        
         rwinfo = g_hash_table_lookup(cc_of_global.ofrw_htbl, &rwkey);
         if (rwinfo == NULL) {
             CC_LOG_ERROR("%s(%d): could not find rwsockinfo in ofrw_htbl"
@@ -309,17 +373,36 @@ cc_of_dev_free(uint32_t controller_ip_addr,
             continue;
         }
         elem = elem->next;
+#ifdef NOTYET            
         status = cc_of_global.NET_SVCS[rwinfo->layer4_proto].close_conn(rwkey.rw_sockfd);
+#else
+        status = find_thrmgr_rwsocket(rwkey.rw_sockfd, &tmgr);
         if (status < 0) {
+            CC_LOG_ERROR("%s(%d): could not find tmgr for tcp sockfd %d",
+                         __FUNCTION__, __LINE__, rwkey.rw_sockfd);
+        }
+        thr_msg.fd = rwkey.rw_sockfd;
+        thr_msg.fd_type = SOCKET;
+        thr_msg.fd_action = DELETE_FD;
+        // Update global htbls
+        status = cc_del_sockfd_rw_pollthr(tmgr, &thr_msg);
+        if (status < 0) {
+            CC_LOG_ERROR("%s(%d): %s, error while deleting tcp sockfd %d "
+                         "from global structures", __FUNCTION__, __LINE__, 
+                         cc_of_strerror(status), thr_msg.fd);
+        }
+#endif
+    if (status < 0) {
             CC_LOG_ERROR("%s(%d): %s, Error while closing ofchannel"
                          "sockfd-%d", __FUNCTION__, __LINE__,
                          cc_of_strerror(status), rwkey.rw_sockfd);
         }
     }
-    
+
+#ifdef NOTYET
     // close main tcp listenfd and remove it from oflisten_pollthr.
     // the main_sockfd_udp is part of ofrw_socket_list. It must be cleaned up already.
-    thr_msg.fd = dev_info->main_sockfd_tcp;
+    thr_msg.fd = ht_dinfo->main_sockfd_tcp;
     thr_msg.fd_type = SOCKET;
     thr_msg.fd_action = DEL;
 
@@ -328,28 +411,36 @@ cc_of_dev_free(uint32_t controller_ip_addr,
         CC_LOG_ERROR("%s(%d):Error deleting tcp_listenfd from oflisten_pollthr_p: %s",
                      __FUNCTION__, __LINE__, cc_of_strerror(errno));
     }
-    status = close(dev_info->main_sockfd_tcp);
+    status = close(ht_dinfo->main_sockfd_tcp);
     if (status < 0) {
         CC_LOG_ERROR("%s(%d):Error closing tcp_listenfd: %s",
                      __FUNCTION__, __LINE__, strerror(errno));
     }
+#endif
 
     // delete dev from devhtbl
-    status = update_global_htbl(OFDEV, DEL, &dev_key, NULL, &new_entry);
+
+    status = update_global_htbl(OFDEV, DEL, ht_dkey, NULL, &new_entry);
+
+
+    
     if (status < 0) {
         CC_LOG_ERROR("%s(%d): %s, Error while freeing dev"
                      "controller_ip-%s, switch_ip-%s,"
-                     "controller_l4_port-%hu",__FUNCTION__, __LINE__,
+                     "controller_l4_port-%hu",
+                     __FUNCTION__, __LINE__,
                      cc_of_strerror(status), controller_ip, switch_ip, 
                      controller_L4_port);
         return status;
     }
+
 
     CC_LOG_INFO("%s(%d):, Devfree success for device"
                  "controller_ip-%s, switch_ip-%s,"
                  "controller_l4_port-%hu",__FUNCTION__, __LINE__,
                  controller_ip, switch_ip, controller_L4_port);
 
+    g_free(dkey);
     return status;
 }
 

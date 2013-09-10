@@ -632,6 +632,7 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, adpoll_thr_msg_t *thr_msg)
     cc_ofrw_info_t *rwinfo_p = NULL;
     GList *tmp_list = NULL;
     adpoll_thread_mgr_t  *tmp_tmgr = NULL;
+    gpointer rwht_key, rwht_info;
     
     CC_LOG_DEBUG("%s(%d) Thread: %s, fd: %d, type: %s", __FUNCTION__,
                  __LINE__, tmgr->tname, thr_msg->fd,
@@ -677,6 +678,17 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, adpoll_thr_msg_t *thr_msg)
     }
     
     rwkey.rw_sockfd = thr_msg->fd;
+    if (g_hash_table_contains(cc_of_global.ofrw_htbl, &rwkey)) {
+        CC_LOG_DEBUG("%s(%d) - ofrw_htbl does contain %d",
+                     __FUNCTION__, __LINE__, rwkey.rw_sockfd);
+    }
+
+//    if (g_hash_table_lookup_extended(cc_of_global.ofrw_htbl, &rwkey,
+//                                     rwht_key, rwht_info) == FALSE) {
+//        CC_LOG_DEBUG("%s(%d) ofrw_htbl does not have the entry for fd %d",
+//                     __FUNCTION__, __LINE__, rwkey.rw_sockfd);
+//    }
+    
     rwinfo_p = g_hash_table_lookup(cc_of_global.ofrw_htbl, &rwkey);
 
     if (rwinfo_p) {

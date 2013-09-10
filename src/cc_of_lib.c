@@ -222,7 +222,7 @@ cc_of_ret cc_of_dev_register(uint32_t controller_ipaddr,
 
     dev_info->recv_func = recv_func;
 
-    #if NOTYET
+
     if (cc_of_global.ofdev_type == CONTROLLER) {
 
         // Create a TCP sockfd for tcp connections
@@ -254,7 +254,7 @@ cc_of_ret cc_of_dev_register(uint32_t controller_ipaddr,
                  "Created UDP serverfd");
  
     }
-    #endif
+
 
     // Add this new device entry to ofdev_htbl
     g_hash_table_insert(cc_of_global.ofdev_htbl, (gpointer)key, 
@@ -299,9 +299,7 @@ cc_of_dev_free(uint32_t controller_ip_addr,
     adpoll_thr_msg_t thr_msg;
     GList *elem = NULL;
     gboolean new_entry;
-#ifndef NOTYET
     adpoll_thread_mgr_t *tmgr = NULL;
-#endif
 
     dkey = g_malloc0(sizeof(cc_ofdev_key_t));    
     dkey->controller_ip_addr = controller_ip_addr;
@@ -361,21 +359,27 @@ cc_of_dev_free(uint32_t controller_ip_addr,
     while (elem != NULL) {
         cc_ofrw_key_t rwkey;
         cc_ofrw_info_t *rwinfo;
+        gpointer rwht_key, rwht_info;
 
         rwkey.rw_sockfd = *((int *)(elem->data));
         CC_LOG_DEBUG("%s %d here....here", __FUNCTION__, __LINE__);
         CC_LOG_DEBUG("rw sockfd found: %d", rwkey.rw_sockfd);
+
+        if (g_hash_table_lookup_extended(cc_of_global.ofrw_htbl, &rwkey,
+                                         rwht_key, rwht_info) == FALSE);
         
-        rwinfo = g_hash_table_lookup(cc_of_global.ofrw_htbl, &rwkey);
+        rwinfo = (cc_ofrw_info_t *)rwht_info;
         if (rwinfo == NULL) {
             CC_LOG_ERROR("%s(%d): could not find rwsockinfo in ofrw_htbl"
                          "for sockfd-%d", __FUNCTION__, __LINE__, rwkey.rw_sockfd);
             continue;
         }
         elem = elem->next;
-#ifdef NOTYET            
+
         status = cc_of_global.NET_SVCS[rwinfo->layer4_proto].close_conn(rwkey.rw_sockfd);
-#else
+
+#if 0
+        //used instead of net svcs to test the dev_free
         status = find_thrmgr_rwsocket(rwkey.rw_sockfd, &tmgr);
         if (status < 0) {
             CC_LOG_ERROR("%s(%d): could not find tmgr for tcp sockfd %d",
@@ -399,7 +403,6 @@ cc_of_dev_free(uint32_t controller_ip_addr,
         }
     }
 
-#ifdef NOTYET
     // close main tcp listenfd and remove it from oflisten_pollthr.
     // the main_sockfd_udp is part of ofrw_socket_list. It must be cleaned up already.
     thr_msg.fd = ht_dinfo->main_sockfd_tcp;
@@ -416,7 +419,6 @@ cc_of_dev_free(uint32_t controller_ip_addr,
         CC_LOG_ERROR("%s(%d):Error closing tcp_listenfd: %s",
                      __FUNCTION__, __LINE__, strerror(errno));
     }
-#endif
 
     // delete dev from devhtbl
 
@@ -493,26 +495,30 @@ cc_of_destroy_channel(uint64_t dp_id, uint8_t aux_id)
     cc_ofchannel_info_t *ofchann_info;
     cc_ofrw_key_t rwkey;
     cc_ofrw_info_t *rwinfo = NULL;
+    gpointer chht_key, chht_info, rwht_key, rwht_info;
 
     ofchann_key.dp_id = dp_id;
     ofchann_key.aux_id = aux_id;
 
-    ofchann_info = g_hash_table_lookup(cc_of_global.ofchannel_htbl, 
-                                       &ofchann_key);
-    if (ofchann_info == NULL) {
+    if (g_hash_table_lookup_extended(cc_of_global.ofchannel_htbl, 
+                                     &ofchann_key, chht_key,
+                                     chht_info) == FALSE) {
         CC_LOG_ERROR("%s(%d):, could not find ofchann_info in ofchannel_htbl"
                      "for key dp_id-%lu, aux_id-%u",__FUNCTION__, __LINE__, 
                      dp_id, aux_id);
         return CC_OF_EINVAL;
     }
-
+    
+    ofchann_info = (cc_ofchannel_info_t *)chht_info;
+        
     rwkey.rw_sockfd = ofchann_info->rw_sockfd;
-    rwinfo = g_hash_table_lookup(cc_of_global.ofrw_htbl, &rwkey);
-    if (rwinfo == NULL) {
+    if (g_hash_table_lookup_extended(cc_of_global.ofrw_htbl, &rwkey,
+                                     rwht_key, rwht_info) == FALSE) {
         CC_LOG_ERROR("%s(%d): could not find rwsockinfo in ofrw_htbl"
                      "for sockfd-%d", __FUNCTION__, __LINE__, rwkey.rw_sockfd);
         return CC_OF_EINVAL;
     }
+    rwinfo = (cc_ofrw_info_t *)rwht_info;
 
     status = cc_of_global.NET_SVCS[rwinfo->layer4_proto].close_conn(ofchann_info->rw_sockfd);
     if (status < 0) {
@@ -539,6 +545,7 @@ cc_of_send_pkt(uint64_t dp_id, uint8_t aux_id, void *of_msg,
     adpoll_send_msg_t  *msg_p;
     msg_p = (adpoll_send_msg_t *)SEND_MSG_BUF;
     cc_ofchannel_key_t chann_id;
+    gpointer chht_key, chht_info;
 
     chann_id.dp_id = dp_id;
     chann_id.aux_id = aux_id;
@@ -549,8 +556,13 @@ cc_of_send_pkt(uint64_t dp_id, uint8_t aux_id, void *of_msg,
         return CC_OF_EINVAL;
     }
     g_mutex_lock(&cc_of_global.ofchannel_htbl_lock);
-    chann_info = g_hash_table_lookup(cc_of_global.ofchannel_htbl,
-                                     (gconstpointer)&chann_id);
+    if (g_hash_table_lookup_extended(cc_of_global.ofchannel_htbl,
+                                     (gconstpointer)&chann_id,
+                                     chht_key, chht_info) == FALSE) {
+        CC_LOG_ERROR("%s(%d): channel %lu/%lu not found", __FUNCTION__,
+                     __LINE__, chann_id.dp_id, chann_id.aux_id);
+    }
+    chann_info = (cc_ofchannel_key_t *)chht_info;
     send_rwsock = chann_info->rw_sockfd;
 
     find_thrmgr_rwsocket(send_rwsock, &tmgr);
@@ -581,20 +593,23 @@ cc_of_set_real_dpid_auxid(uint64_t dummy_dpid, uint8_t dummy_auxid,
     cc_ofchannel_info_t ofchann_info_new;
     cc_ofchannel_key_t ofchann_key_old, ofchann_key_new;
     gboolean new_entry;
+    gpointer chht_key, chht_info;
 
     ofchann_key_new.dp_id = dp_id;
     ofchann_key_new.aux_id = aux_id;
     ofchann_key_old.dp_id = dummy_dpid;
     ofchann_key_old.aux_id = dummy_auxid;
 
-    ofchann_info_old = g_hash_table_lookup(cc_of_global.ofchannel_htbl, 
-                                       &ofchann_key_old);
-    if (ofchann_info_old == NULL) {
+    if (g_hash_table_lookup_extended(cc_of_global.ofchannel_htbl, 
+                                     &ofchann_key_old,
+                                     chht_key, chht_info) == FALSE) {
         CC_LOG_ERROR("%s(%d):, could not find ofchann_info in ofchannel_htbl"
                      "for key dummy_dpid-%lu, dummy_auxid-%u",__FUNCTION__, 
                      __LINE__, dummy_dpid, dummy_auxid);
         return CC_OF_EINVAL;
     }
+    
+    ofchann_info_old = (cc_ofchannel_info_t *)chht_info;
 
     memcpy(&ofchann_info_new, ofchann_info_old, sizeof(cc_ofchannel_info_t));
     status = del_ofchann_rwsocket((int)dummy_dpid);

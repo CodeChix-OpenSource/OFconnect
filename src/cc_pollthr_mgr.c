@@ -466,6 +466,13 @@ pollthr_pri_pipe_process_func(char *tname,
           CC_LOG_DEBUG("%s(%d): fd ADD %d of type %d of action %d",
                        __FUNCTION__, __LINE__, msg.fd, msg.fd_type,
                        msg.fd_action);
+
+          /* check for existing entry */
+          g_assert(g_list_find_custom(
+                       thr_pvt_p->fd_list,
+                       &msg.fd,
+                       fdinfo_compare_fd) == NULL);
+          
           fd_entry_p = (adpoll_fd_info_t *)malloc(sizeof(adpoll_fd_info_t));
           fd_entry_p->fd = msg.fd;
           fd_entry_p->fd_type = msg.fd_type;

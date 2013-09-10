@@ -241,6 +241,7 @@ cc_of_dev_register(uint32_t controller_ipaddr,
                  "Created TCP listenfd");
  
         // Create a udp sockfd for udp connections
+#ifdef NOTYET
         dev_info->main_sockfd_udp =
             cc_of_global.NET_SVCS[UDP].open_serverfd(*key);
         if (dev_info->main_sockfd_udp < 0) {
@@ -251,6 +252,8 @@ cc_of_dev_register(uint32_t controller_ipaddr,
             g_free(dev_info);
 	        return status;
         }
+#endif        
+
         CC_LOG_DEBUG("%s(%d): %s", __FUNCTION__, __LINE__,
                  "Created UDP serverfd");
  
@@ -366,18 +369,36 @@ cc_of_dev_free(uint32_t controller_ip_addr,
         CC_LOG_DEBUG("%s %d here....here", __FUNCTION__, __LINE__);
         CC_LOG_DEBUG("rw sockfd found: %d", rwkey.rw_sockfd);
 
+        print_ofrw_htbl();
+
         if (g_hash_table_lookup_extended(cc_of_global.ofrw_htbl, &rwkey,
-                                         rwht_key, rwht_info) == FALSE) {
+                                         &rwht_key, &rwht_info) == FALSE) {
             CC_LOG_ERROR("%s(%d): ofrw lookup failed", __FUNCTION__,
                          __LINE__);
         }
         
         rwinfo = (cc_ofrw_info_t *)rwht_info;
+
         if (rwinfo == NULL) {
             CC_LOG_ERROR("%s(%d): could not find rwsockinfo in ofrw_htbl"
                          "for sockfd-%d", __FUNCTION__, __LINE__, rwkey.rw_sockfd);
             continue;
+        } else {
+            CC_LOG_DEBUG("%s(%d): found rwsock %d with rwinfo: "
+                        "info: layer4_proto: %s "
+                        "info: poll thread name: %s",
+                        "info: devkey controller ip: 0x%x",
+                        "info: devkey switch ip: 0x%x",
+                        "info: devkey l4port: %d",
+                         __FUNCTION__, __LINE__,
+                        rwkey.rw_sockfd,
+                        (rwinfo->layer4_proto == TCP)? "TCP":"UDP",
+                        rwinfo->thr_mgr_p->tname,
+                        rwinfo->dev_key.controller_ip_addr,
+                        rwinfo->dev_key.switch_ip_addr,
+                        rwinfo->dev_key.controller_L4_port);
         }
+                         
         elem = elem->next;
 
         status = cc_of_global.NET_SVCS[rwinfo->layer4_proto].close_conn(rwkey.rw_sockfd);
@@ -506,8 +527,8 @@ cc_of_destroy_channel(uint64_t dp_id, uint8_t aux_id)
     ofchann_key.aux_id = aux_id;
 
     if (g_hash_table_lookup_extended(cc_of_global.ofchannel_htbl, 
-                                     &ofchann_key, chht_key,
-                                     chht_info) == FALSE) {
+                                     &ofchann_key, &chht_key,
+                                     &chht_info) == FALSE) {
         CC_LOG_ERROR("%s(%d):, could not find ofchann_info in ofchannel_htbl"
                      "for key dp_id-%lu, aux_id-%u",__FUNCTION__, __LINE__, 
                      dp_id, aux_id);
@@ -518,7 +539,7 @@ cc_of_destroy_channel(uint64_t dp_id, uint8_t aux_id)
         
     rwkey.rw_sockfd = ofchann_info->rw_sockfd;
     if (g_hash_table_lookup_extended(cc_of_global.ofrw_htbl, &rwkey,
-                                     rwht_key, rwht_info) == FALSE) {
+                                     &rwht_key, &rwht_info) == FALSE) {
         CC_LOG_ERROR("%s(%d): could not find rwsockinfo in ofrw_htbl"
                      "for sockfd-%d", __FUNCTION__, __LINE__, rwkey.rw_sockfd);
         return CC_OF_EINVAL;
@@ -563,7 +584,7 @@ cc_of_send_pkt(uint64_t dp_id, uint8_t aux_id, void *of_msg,
     g_mutex_lock(&cc_of_global.ofchannel_htbl_lock);
     if (g_hash_table_lookup_extended(cc_of_global.ofchannel_htbl,
                                      (gconstpointer)&chann_id,
-                                     chht_key, chht_info) == FALSE) {
+                                     &chht_key, &chht_info) == FALSE) {
         CC_LOG_ERROR("%s(%d): channel %d/%d not found", __FUNCTION__,
                      __LINE__, (int)chann_id.dp_id,
                      (int)chann_id.aux_id);
@@ -608,7 +629,7 @@ cc_of_set_real_dpid_auxid(uint64_t dummy_dpid, uint8_t dummy_auxid,
 
     if (g_hash_table_lookup_extended(cc_of_global.ofchannel_htbl, 
                                      &ofchann_key_old,
-                                     chht_key, chht_info) == FALSE) {
+                                     &chht_key, &chht_info) == FALSE) {
         CC_LOG_ERROR("%s(%d):, could not find ofchann_info in ofchannel_htbl"
                      "for key dummy_dpid-%lu, dummy_auxid-%u",__FUNCTION__, 
                      __LINE__, dummy_dpid, dummy_auxid);

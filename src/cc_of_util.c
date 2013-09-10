@@ -101,6 +101,11 @@ gboolean cc_ofrw_htbl_equal_func(gconstpointer a, gconstpointer b)
     a_rw = (cc_ofrw_key_t *)a;
     b_rw = (cc_ofrw_key_t *)b;
 
+    CC_LOG_DEBUG("%s: a rw_sockfd %d b is %d",
+                 __FUNCTION__,
+                 a_rw->rw_sockfd,
+                 b_rw->rw_sockfd);
+    
     if (a_rw->rw_sockfd == b_rw->rw_sockfd) {
 	    return TRUE;
     } else {
@@ -175,16 +180,79 @@ update_global_htbl(htbl_type_e htbl_type,
     if (htbl_op == ADD) {
 
         old_count = g_hash_table_size(cc_htbl);
-        CC_LOG_DEBUG("%s(%d): insert operation", __FUNCTION__, __LINE__);
+        CC_LOG_DEBUG("%s(%d): insert operation for htbl_type %s",
+                     __FUNCTION__, __LINE__,
+                     (htbl_type == OFDEV)? "OFDEV":
+                     ((htbl_type == OFRW)?"OFRW":"OFCHANN"));
         if (htbl_type == OFDEV) {
             CC_LOG_DEBUG("%s(%d) key has controller ip 0x%x, switch ip 0x%x and port %d",
                          __FUNCTION__, __LINE__,
                          ((cc_ofdev_key_t *)htbl_key)->controller_ip_addr,
                          ((cc_ofdev_key_t *)htbl_key)->switch_ip_addr,
                          ((cc_ofdev_key_t *)htbl_key)->controller_L4_port);
+        } else if (htbl_type == OFRW) {
+            CC_LOG_DEBUG("%s(%d) insert key has socket %d",
+                         __FUNCTION__, __LINE__,
+                         ((cc_ofrw_key_t *)htbl_key)->rw_sockfd);
+
+            CC_LOG_DEBUG("%s(%d) insert info has l4 proto %s",
+                         __FUNCTION__, __LINE__,
+                         (((cc_ofrw_info_t *)htbl_data)->layer4_proto == TCP)?
+                         "TCP":((((cc_ofrw_info_t *)htbl_data)->layer4_proto
+                                 == UDP)? "UDP":"INVALID"));
+
+            if (g_hash_table_contains(cc_htbl, htbl_key)) {
+                CC_LOG_DEBUG("(%s(%d): OFRW htbl already contains %d",
+                             __FUNCTION__, __LINE__,
+                             ((cc_ofrw_key_t *)htbl_key)->rw_sockfd);
+            }
         }
+
         g_hash_table_insert(cc_htbl, htbl_key, htbl_data);
-        print_ofdev_htbl();
+
+        if (htbl_type == OFDEV) {
+            print_ofdev_htbl();
+        } else if (htbl_type == OFRW) {
+            gpointer rwht_key = NULL, rwht_info = NULL;
+            if (g_hash_table_contains(cc_htbl, htbl_key)) {
+                CC_LOG_DEBUG("(%s(%d): OFRW htbl contains %d",
+                             __FUNCTION__, __LINE__,
+                             ((cc_ofrw_key_t *)htbl_key)->rw_sockfd);
+            }
+            CC_LOG_DEBUG("OFRW htbl size after insert of %d: %d",
+                         ((cc_ofrw_key_t *)htbl_key)->rw_sockfd,
+                         g_hash_table_size(cc_htbl));
+            print_ofrw_htbl();
+
+            if (g_hash_table_lookup_extended(cc_of_global.ofrw_htbl,
+                                             htbl_key,
+                                             &rwht_key, &rwht_info)
+                == FALSE) {
+                CC_LOG_DEBUG("extended lookup failed");
+            } else {
+                cc_ofrw_key_t *rw_key =  NULL;
+                cc_ofrw_info_t *rw_info = NULL;
+                rw_key = (cc_ofrw_key_t *)rwht_key;
+                rw_info = (cc_ofrw_info_t *)rwht_info;
+                CC_LOG_DEBUG("extended lookup passed");
+                CC_LOG_INFO("key: rw_sockfd: %d "
+                            "info: layer4_proto: %s "
+                            "info: poll thread name: %s",
+                            "info: devkey controller ip: 0x%x",
+                            "info: devkey switch ip: 0x%x",
+                            "info: devkey l4port: %d",
+                            rw_key->rw_sockfd,
+                            (rw_info->layer4_proto == TCP)? "TCP":"UDP",
+                            rw_info->thr_mgr_p->tname,
+                            rw_info->dev_key.controller_ip_addr,
+                            rw_info->dev_key.switch_ip_addr,
+                            rw_info->dev_key.controller_L4_port);
+                
+            }
+            CC_LOG_DEBUG("%s(%d) key has socket %d",
+                         __FUNCTION__, __LINE__,
+                         ((cc_ofrw_key_t *)htbl_key)->rw_sockfd);
+        } 
         
         if (g_hash_table_size(cc_htbl) > old_count) {
             *new_entry = TRUE;
@@ -251,9 +319,41 @@ print_ofdev_htbl(void)
     list_elem = g_list_first(dev_info->ofrw_socket_list);
     while (list_elem) {
         CC_LOG_INFO("sockfd: %d",*(int *)(list_elem->data));
-        list_elem = g_list_next(dev_info->ofrw_socket_list);
+        list_elem = g_list_next(list_elem);
     }
     
+}
+
+void
+print_ofrw_htbl(void)
+{
+    GHashTableIter ofrw_iter;
+    cc_ofrw_key_t *rw_key = NULL;
+    cc_ofrw_info_t *rw_info = NULL;
+    g_hash_table_iter_init(&ofrw_iter, cc_of_global.ofrw_htbl);
+    
+    CC_LOG_INFO("Printing ofrw Hash Table");
+    if (g_hash_table_iter_next(&ofrw_iter,
+                               (gpointer *)&rw_key,
+                               (gpointer *)&rw_info)) {
+        if (rw_info->thr_mgr_p == NULL) {
+            CC_LOG_ERROR("%s(%d): no polling thread for %d",
+                         __FUNCTION__, __LINE__, rw_key->rw_sockfd);
+        } else {
+            CC_LOG_INFO("key: rw_sockfd: %d "
+                        "info: layer4_proto: %s "
+                        "info: poll thread name: %s",
+                        "info: devkey controller ip: 0x%x",
+                        "info: devkey switch ip: 0x%x",
+                        "info: devkey l4port: %d",
+                        rw_key->rw_sockfd,
+                        (rw_info->layer4_proto == TCP)? "TCP":"UDP",
+                        rw_info->thr_mgr_p->tname,
+                        rw_info->dev_key.controller_ip_addr,
+                        rw_info->dev_key.switch_ip_addr,
+                        rw_info->dev_key.controller_L4_port);
+        }
+    }
 }
 
 cc_of_ret
@@ -277,8 +377,8 @@ add_upd_ofrw_rwsocket(int add_fd, adpoll_thread_mgr_t  *thr_mgr_p,
     gboolean new_entry;
     cc_of_ret rc;
     CC_LOG_DEBUG("%s(%d)", __FUNCTION__, __LINE__);    
-    ofrw_key = (cc_ofrw_key_t *)g_malloc(sizeof(cc_ofrw_key_t));
-    ofrw_info = (cc_ofrw_info_t *)g_malloc(sizeof(cc_ofrw_info_t));
+    ofrw_key = (cc_ofrw_key_t *)malloc(sizeof(cc_ofrw_key_t));
+    ofrw_info = (cc_ofrw_info_t *)malloc(sizeof(cc_ofrw_info_t));
 
     ofrw_key->rw_sockfd = add_fd;
     ofrw_info->state = CC_OF_RW_DOWN;
@@ -289,8 +389,16 @@ add_upd_ofrw_rwsocket(int add_fd, adpoll_thread_mgr_t  *thr_mgr_p,
     rc = update_global_htbl(OFRW, ADD,
                             ofrw_key, ofrw_info,
                             &new_entry);
+
+//    g_hash_table_insert(cc_of_global.ofrw_htbl, (gpointer)ofrw_key, 
+//                        (gpointer)ofrw_info);
+    
     if (!new_entry) {
-        g_free(ofrw_key);
+        free(ofrw_key);
+    } else {
+        CC_LOG_DEBUG("%s(%d): new entry %d", __FUNCTION__, __LINE__,
+                     add_fd);
+        print_ofrw_htbl();
     }
     return rc;
 }
@@ -445,7 +553,7 @@ del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
     gpointer ht_key, ht_info;
 
     if (g_hash_table_lookup_extended(cc_of_global.ofdev_htbl,
-                                     &key, ht_key, ht_info) == FALSE ) {
+                                     &key, &ht_key, &ht_info) == FALSE ) {
         CC_LOG_ERROR("%s(%d): device not found key controller ip 0x%x "
                      "switch ip 0x%x port %d", __FUNCTION__, __LINE__,
                      key.controller_ip_addr, key.switch_ip_addr, key.controller_L4_port);
@@ -481,10 +589,14 @@ atomic_add_upd_htbls_with_rwsocket(int sockfd, adpoll_thread_mgr_t  *thr_mgr,
 {
     cc_of_ret status = CC_OF_OK;
 
+
     if((status = add_upd_ofrw_rwsocket(sockfd, thr_mgr, layer4_proto, key)) < 0) {
         CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
         return status;
-    } 
+    }
+
+    CC_LOG_DEBUG("%s(%d)....++++...",__FUNCTION__, __LINE__);    
+    print_ofrw_htbl();
     print_ofdev_htbl();
     
     if ((status = add_ofdev_rwsocket(key, sockfd)) < 0) {
@@ -683,13 +795,14 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, adpoll_thr_msg_t *thr_msg)
                      __FUNCTION__, __LINE__, rwkey.rw_sockfd);
     }
 
-//    if (g_hash_table_lookup_extended(cc_of_global.ofrw_htbl, &rwkey,
-//                                     rwht_key, rwht_info) == FALSE) {
-//        CC_LOG_DEBUG("%s(%d) ofrw_htbl does not have the entry for fd %d",
-//                     __FUNCTION__, __LINE__, rwkey.rw_sockfd);
-//    }
+    if (g_hash_table_lookup_extended(cc_of_global.ofrw_htbl, &rwkey,
+                                     &rwht_key, &rwht_info) == FALSE) {
+        CC_LOG_DEBUG("%s(%d) ofrw_htbl does not have the entry for fd %d",
+                     __FUNCTION__, __LINE__, rwkey.rw_sockfd);
+    }
+    rwinfo_p = (cc_ofrw_info_t *)rwht_info;
     
-    rwinfo_p = g_hash_table_lookup(cc_of_global.ofrw_htbl, &rwkey);
+//    rwinfo_p = g_hash_table_lookup(cc_of_global.ofrw_htbl, &rwkey);
 
     if (rwinfo_p) {
         //ofrw_socket_list in device

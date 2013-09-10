@@ -723,8 +723,9 @@ cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key,
     } else {
         /* add the fd to the thr */
         // retval??
-        CC_LOG_DEBUG("%s(%d): adding fd %d to thread",
-                     __FUNCTION__, __LINE__, thr_msg->fd);
+        CC_LOG_DEBUG("%s(%d): adding fd %d to thread %s",
+                     __FUNCTION__, __LINE__, thr_msg->fd,
+                     tmgr->tname);
         adp_thr_mgr_add_del_fd(tmgr, thr_msg);
 
         print_ofdev_htbl();

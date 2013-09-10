@@ -52,6 +52,8 @@ typedef struct test_data_ {
 /*  Function: util_start
  *  This is a fixture function.
  *  Initialize one rw pollthread
+ * create one rw pollthread
+ * create one listenfd pollthread
  */
 static void
 util_start(test_data_t *tdata,
@@ -315,9 +317,10 @@ util_tc_2(test_data_t *tdata, gconstpointer tudata)
     add_fd_msg.pollout_func = NULL;
 
     /* device setup */
-    devkey.controller_ip_addr = 0x00c0ffee;
+    /* ip address 127.0.0.1 */
+    devkey.controller_ip_addr = 0x7F000001;
     devkey.switch_ip_addr = 0x0;
-    devkey.controller_L4_port = 1000;
+    devkey.controller_L4_port = 6633;
 
     retval = cc_of_dev_register(devkey.controller_ip_addr,
                                 devkey.switch_ip_addr,
@@ -1069,7 +1072,7 @@ int main(int argc, char **argv)
 
     g_test_add("/util/tc_2",
                test_data_t,
-               "rwthr_2",
+              "rwthr_2",
                util_start, util_tc_2, util_end);
     
     return g_test_run();

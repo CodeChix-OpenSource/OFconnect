@@ -108,8 +108,23 @@ typedef int (*cc_of_accept)(uint64_t dummy_dpid,
                             uint16_t controller_L4_port);
 
 
-
-
+/**
+ * cc_of_delete_channel
+ *
+ * Description:
+ * This callback function is called by the library everytime
+ * we a connection is deleted. This is to notify the 
+ * controller or switch that a connection is deleted.
+ *
+ * Returns:
+ * Status
+ *
+ * Notes:
+ * 01. This will be a callback. 
+ *
+ */
+typedef int (*cc_of_delete_channel)(uint64_t dpid,
+                                    uint8_t auxid);
 
 /**
  * cc_of_lib_init

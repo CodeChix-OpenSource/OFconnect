@@ -21,7 +21,8 @@
 
 typedef enum htbl_update_ops_ {
     ADD,
-    DEL
+    DEL,
+    UPD
 } htbl_update_ops_e;
 
 typedef enum htbl_type_ {
@@ -55,6 +56,9 @@ update_global_htbl(htbl_type_e htbl_type,
                    gpointer htbl_key,
                    gpointer htbl_data,
                    gboolean *new_entry);
+
+void
+print_ofdev_htbl(void);
 
 cc_of_ret
 del_ofrw_rwsocket(int del_fd);

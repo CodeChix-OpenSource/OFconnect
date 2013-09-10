@@ -13,6 +13,9 @@
 #include "cc_of_util.h"
 #include "cc_of_global.h"
 #include "cc_log.h"
+#include "cc_of_lib.h"
+#include "cc_tcp_conn.h"
+#include "cc_udp_conn.h"
 
 
 #ifndef UNUSED
@@ -21,7 +24,20 @@
 
 #define LIBLOG_SIZE 4096
 
-extern cc_of_global_t cc_of_global;
+#define MAX_TEST_POLLTHR_LIST_SIZE 10
+
+//extern cc_of_global_t cc_of_global;
+extern
+gboolean cc_ofrw_htbl_equal_func(gconstpointer a, gconstpointer b);
+extern
+gboolean cc_ofchannel_htbl_equal_func(gconstpointer a, gconstpointer b);
+extern
+gboolean cc_ofdev_htbl_equal_func(gconstpointer a, gconstpointer b);
+extern
+void cc_of_destroy_generic(gpointer data);
+extern
+void cc_ofdev_htbl_destroy_val(gpointer data);
+
 
 /* Fixture data */
 /* tp_data has one rwpoll thread created at init 
@@ -29,13 +45,15 @@ extern cc_of_global_t cc_of_global;
  * cc_of_global.ofrw_pollthr_list
  */
 typedef struct test_data_ {
-    adpoll_thread_mgr_t tp_data;    
+    adpoll_thread_mgr_t tp_data[MAX_TEST_POLLTHR_LIST_SIZE];
     char                liblog[LIBLOG_SIZE];
 } test_data_t;
     
 /*  Function: util_start
  *  This is a fixture function.
  *  Initialize one rw pollthread
+ * create one rw pollthread
+ * create one listenfd pollthread
  */
 static void
 util_start(test_data_t *tdata,
@@ -43,25 +61,65 @@ util_start(test_data_t *tdata,
 {
     adpoll_thread_mgr_t *temp_mgr_p = NULL;
     char *temp_liblog = NULL;
-    cc_of_ret retval;
+    cc_of_ret status;
 
-    /* initialize and setup debug and logfile */
+    // Initialize cc_of_global
+    cc_of_global.ofut_enable = TRUE;
     cc_of_global.oflog_fd = NULL;
     cc_of_global.oflog_file = malloc(sizeof(char) *
                                      LOG_FILE_NAME_SIZE);
-    g_mutex_init(&cc_of_global.oflog_lock);
-    cc_of_global.ofrw_pollthr_list = NULL;
-    
     cc_of_debug_toggle(TRUE);    //enable if debugging test code
     cc_of_log_toggle(TRUE);
-    cc_of_global.ofut_enable = TRUE;
+    g_mutex_init(&cc_of_global.oflog_lock);
+    g_mutex_init(&cc_of_global.ofdev_htbl_lock);
+    g_mutex_init(&cc_of_global.ofchannel_htbl_lock);
+    g_mutex_init(&cc_of_global.ofrw_htbl_lock);
+    
+    cc_of_global.oflisten_pollthr_p = NULL;
+    cc_of_global.ofrw_pollthr_list = NULL;
+    
+    cc_of_global.ofdev_type = CONTROLLER;
+    cc_of_global.ofdev_htbl = g_hash_table_new_full(cc_ofdev_hash_func,
+                                                    cc_ofdev_htbl_equal_func,
+                                                    cc_of_destroy_generic,
+                                                    cc_ofdev_htbl_destroy_val);
+    g_assert(cc_of_global.ofdev_htbl != NULL);
 
+
+    cc_of_global.ofchannel_htbl = g_hash_table_new_full(cc_ofchann_hash_func,
+                                                        cc_ofchannel_htbl_equal_func,
+                                                        cc_of_destroy_generic,
+                                                        cc_of_destroy_generic);
+    g_assert(cc_of_global.ofdev_htbl != NULL);
+
+
+    cc_of_global.ofrw_htbl = g_hash_table_new_full(cc_ofrw_hash_func,
+                                                   cc_ofrw_htbl_equal_func,
+                                                   cc_of_destroy_generic,
+                                                   cc_of_destroy_generic);
+
+    g_assert (cc_of_global.ofdev_htbl != NULL);
+
+   
     cc_of_log_clear();
-    retval = cc_create_rw_pollthr(&temp_mgr_p);
+    cc_create_rw_pollthr(&temp_mgr_p);
     g_assert(temp_mgr_p != NULL);
     
-    g_memmove(&tdata->tp_data, temp_mgr_p, sizeof(adpoll_thread_mgr_t));
+    g_memmove(&tdata->tp_data[0], temp_mgr_p, sizeof(adpoll_thread_mgr_t));
 
+    cc_of_global.NET_SVCS[TCP] = tcp_sockfns;
+    cc_of_global.NET_SVCS[UDP] = udp_sockfns;
+
+    cc_of_global.oflisten_pollthr_p = adp_thr_mgr_new("oflisten_thr",
+                                                      MAX_PER_THREAD_RWSOCKETS,
+                                                      MAX_PER_THREAD_PIPES);
+    if (cc_of_global.oflisten_pollthr_p == NULL) {
+	    status = CC_OF_EMISC;
+	    cc_of_lib_free();
+	    CC_LOG_FATAL("%s(%d): %s", __FUNCTION__, __LINE__,
+                     cc_of_strerror(status));
+    }
+   
     temp_liblog = cc_of_log_read();
     
     if (temp_liblog) {
@@ -80,40 +138,15 @@ free_pollthr_list_elem(adpoll_thread_mgr_t *elem)
 }
 
 static void
-util_end(test_data_t *tdata,
+util_end(test_data_t *tdata UNUSED,
          gconstpointer tudata UNUSED)
 {
-    adpoll_thread_mgr_t *traverse = NULL;
-    GList *tmp_list = NULL;
-    int n;
-    
     cc_of_log_toggle(FALSE);
     cc_of_global.ofut_enable = FALSE;
 
     g_test_message("In UTIL_END");
 
-    //walk the list and foreach, call adp_thr_mgr_free()
-    //adp_thr_mgr_free(&(tdata->tp_data));
-    //clear the global  list ofrw_pollthr_list
-    
-    /* find and delete the list entry for this pipe fd */
-    n = g_list_length(cc_of_global.ofrw_pollthr_list);
-    g_test_message("num elements in ofrw_pollthr_list: %d",n);
-    CC_LOG_DEBUG("num elements in ofrw_pollthr_list: %d", n);
-
-    tmp_list = g_list_first(cc_of_global.ofrw_pollthr_list);
-    while (tmp_list != NULL) {
-        traverse = tmp_list->data;
-        CC_LOG_DEBUG("%s thread is %s", __FUNCTION__, traverse->tname);
-        adp_thr_mgr_free(traverse);
-        tmp_list = g_list_next(tmp_list);
-    }
-
-    g_list_free_full(cc_of_global.ofrw_pollthr_list,
-                     free_pollthr_list_elem);
-    
-    g_mutex_clear(&cc_of_global.oflog_lock);
-    g_free(cc_of_global.oflog_file);
+    cc_of_lib_free();
 }
 
 void
@@ -153,93 +186,258 @@ util_tc_1(test_data_t *tdata, gconstpointer tudata)
     GList *first_elem_list = NULL;
     adpoll_thread_mgr_t *list_elem = NULL;
     
-    if (tdata != NULL) {
-        g_test_message("test - name of thread is %s", (char *)tudata);
-        g_assert_cmpstr(tdata->tp_data.tname, ==, (char *)tudata);
-
-        g_test_message("add del mutex %p cv %p", tdata->tp_data.add_del_pipe_cv_mutex,
-                       tdata->tp_data.add_del_pipe_cv_cond);                   
-        
-        g_test_message("test - 2 pipes created; 4 pipe fds");
-        g_test_message("test - num_pipes %d", tdata->tp_data.num_pipes);
-        g_assert_cmpuint(tdata->tp_data.num_pipes, ==, 4);
-        
-        g_test_message("test - num_avail_sockfd is MAX_PER_THREAD_RWSOCKETS");
-        g_assert_cmpint(adp_thr_mgr_get_num_avail_sockfd(&tdata->tp_data),
-                        ==, MAX_PER_THREAD_RWSOCKETS);
-
-        g_test_message("test - output of log follows");
-        g_test_message("%s",tdata->liblog);
-        g_test_message("test - output of log ends");
-
-        g_test_message("test - num fd_entry_p in fd_list is 1");
-        regex_one_compint(
-            tdata->liblog,
-            "fd_list has ([0-9]+) entries SETUP PRI PIPE",
-            1, 1);
-
-        g_test_message("test - value of primary pipe read fd");
-        regex_one_compint(
-            tdata->liblog,
-            "pipe fds created.*([0-9])..([0-9])..PRIMARY",
-            1, adp_thr_mgr_get_pri_pipe_rd(&tdata->tp_data));
-        
-        g_test_message("test - value of primary pipe write fd");
-        regex_one_compint(
-            tdata->liblog,
-            "pipe fds created.*([0-9])..([0-9])..PRIMARY",
-            2, adp_thr_mgr_get_pri_pipe_wr(&tdata->tp_data));
-        
-
-        g_test_message("test - num fd_entry_p in fd_list is 2");        
-        regex_one_compint(
-            tdata->liblog,
-            "fd_list has ([0-9]) entries ADD_FD",
-            1, 2);
-
-        g_test_message("test - value of data pipe read fd");
-        regex_one_compint(
-            tdata->liblog,
-            "pipe fds created.*([0-9])..([0-9])..ADD-ON",
-            1, adp_thr_mgr_get_data_pipe_rd(&tdata->tp_data));
-
-        g_test_message("test - value of data pipe write fd");
-        regex_one_compint(
-            tdata->liblog,
-            "pipe fds created.*([0-9])..([0-9])..ADD-ON",
-            2, adp_thr_mgr_get_data_pipe_wr(&tdata->tp_data));
-
-        g_test_message("test - num_pollfds");
-        regex_one_compint(
-            tdata->liblog,
-            "num pollfds is ([0-9]+) after ADD_FD",
-            1, 2);
-
-
-        // now compare the global list element to the fixture data
-        first_elem_list = g_list_first(cc_of_global.ofrw_pollthr_list);
-        list_elem = (adpoll_thread_mgr_t *)first_elem_list->data;
-
-        g_assert_cmpstr(list_elem->tname, ==, tdata->tp_data.tname);
-        g_assert_cmpuint(list_elem->num_sockets, ==, tdata->tp_data.num_sockets);
-        g_assert_cmpuint(list_elem->num_pipes, ==, tdata->tp_data.num_pipes);
-        g_assert_cmpuint(list_elem->max_sockets, ==, tdata->tp_data.max_sockets);
-        g_assert_cmpuint(list_elem->max_pipes, ==, tdata->tp_data.max_pipes);
+    g_test_message("test - name of thread is %s", (char *)tudata);
+    g_assert_cmpstr(tdata->tp_data[0].tname, ==, (char *)tudata);
     
-    } else {
-        g_test_message("fixture data invalid");
-        g_test_fail();
-    }
+    g_test_message("add del mutex %p cv %p", tdata->tp_data[0].add_del_pipe_cv_mutex,
+                   tdata->tp_data[0].add_del_pipe_cv_cond);                   
+    
+    g_test_message("test - 2 pipes created; 4 pipe fds");
+    g_test_message("test - num_pipes %d", tdata->tp_data[0].num_pipes);
+    g_assert_cmpuint(tdata->tp_data[0].num_pipes, ==, 4);
+    
+    g_test_message("test - num_avail_sockfd is MAX_PER_THREAD_RWSOCKETS");
+    g_assert_cmpint(adp_thr_mgr_get_num_avail_sockfd(&tdata->tp_data[0]),
+                    ==, MAX_PER_THREAD_RWSOCKETS);
+    
+    g_test_message("test - output of log follows");
+    g_test_message("%s",tdata->liblog);
+    g_test_message("test - output of log ends");
+    
+    g_test_message("test - num fd_entry_p in fd_list is 1");
+    regex_one_compint(
+        tdata->liblog,
+        "fd_list has ([0-9]+) entries SETUP PRI PIPE",
+        1, 1);
+    
+    g_test_message("test - value of primary pipe read fd");
+    regex_one_compint(
+        tdata->liblog,
+        "pipe fds created.*([0-9])..([0-9])..PRIMARY",
+        1, adp_thr_mgr_get_pri_pipe_rd(&tdata->tp_data[0]));
+    
+    g_test_message("test - value of primary pipe write fd");
+    regex_one_compint(
+        tdata->liblog,
+        "pipe fds created.*([0-9])..([0-9])..PRIMARY",
+        2, adp_thr_mgr_get_pri_pipe_wr(&tdata->tp_data[0]));
+    
+    
+    g_test_message("test - num fd_entry_p in fd_list is 2");        
+    regex_one_compint(
+        tdata->liblog,
+        "fd_list has ([0-9]) entries ADD_FD",
+        1, 2);
+    
+    g_test_message("test - value of data pipe read fd");
+    regex_one_compint(
+        tdata->liblog,
+        "pipe fds created.*([0-9])..([0-9])..ADD-ON",
+        1, adp_thr_mgr_get_data_pipe_rd(&tdata->tp_data[0]));
+    
+    g_test_message("test - value of data pipe write fd");
+    regex_one_compint(
+        tdata->liblog,
+        "pipe fds created.*([0-9])..([0-9])..ADD-ON",
+        2, adp_thr_mgr_get_data_pipe_wr(&tdata->tp_data[0]));
+    
+    g_test_message("test - num_pollfds");
+    regex_one_compint(
+        tdata->liblog,
+        "num pollfds is ([0-9]+) after ADD_FD",
+        1, 2);
+    
+    
+    // now compare the global list element to the fixture data
+    g_test_message("test - sanity of element in ofrw_pollthr_list");
+
+    g_assert(g_list_length(cc_of_global.ofrw_pollthr_list) == 1);
+    first_elem_list = g_list_first(cc_of_global.ofrw_pollthr_list);
+    list_elem = (adpoll_thread_mgr_t *)first_elem_list->data;
+    
+    g_assert_cmpstr(list_elem->tname, ==, tdata->tp_data[0].tname);
+    g_assert_cmpuint(list_elem->num_sockets, ==, tdata->tp_data[0].num_sockets);
+    g_assert_cmpuint(list_elem->num_pipes, ==, tdata->tp_data[0].num_pipes);
+    g_assert_cmpuint(list_elem->max_sockets, ==, tdata->tp_data[0].max_sockets);
+    g_assert_cmpuint(list_elem->max_pipes, ==, tdata->tp_data[0].max_pipes);
+    
 }
 
+gboolean fd_is_unique(gint32 fd_arr[], gint32 fd_arr_size, gint32 fd)
+{
+    int i;
+    
+    if (fd_arr_size == 0) {
+        return TRUE;
+    }
+
+    for (i = 0; i < fd_arr_size; i++) {
+        if (fd_arr[i] == fd) {
+            return TRUE;
+        }
+    }
+    
+    return FALSE;
+}
+
+/* we are not testing this functionality here */
+/* therefore using a noop function for dev register */
+int dummy_recv_func(uint64_t dp_id UNUSED,
+                    uint8_t aux_id UNUSED,
+                    void *of_msg UNUSED,
+                    size_t of_msg_len UNUSED)
+{
+    return 1;
+}
+
+// test cc_find_or_create_rw_pollthr
+// cc_del_sockfd_rw_pollthr and cc_add_sockfd_rw_pollthr
+// add MAX_PER_THREAD_RWSOCKETS - 1 fds - total threads: 1
+// + 1 fd - total threads: 1
+// +1 fd - total threads: 2
+// -2 fd - total threads: 1
+
+static void
+util_tc_2(test_data_t *tdata, gconstpointer tudata)
+{
+    GRand *random_gen = NULL;
+    gint32 dummy_fd;
+    gint32 testfd_arr[1000]; // to check for uniqueness of generated fds
+    gint32 num_fds = 0;
+    adpoll_thr_msg_t add_fd_msg;
+    cc_ofdev_key_t devkey;
+    cc_ofchannel_key_t chankey;
+    cc_of_ret retval;
+
+    /* add_fd_msg setup */
+    add_fd_msg.fd_type = SOCKET;
+    add_fd_msg.fd_action = ADD_FD;
+    add_fd_msg.poll_events = 0;
+    add_fd_msg.pollin_func = NULL;
+    add_fd_msg.pollout_func = NULL;
+
+    /* device setup */
+    /* ip address 127.0.0.1 */
+    devkey.controller_ip_addr = 0x7F000001;
+    devkey.switch_ip_addr = 0x0;
+    devkey.controller_L4_port = 6633;
+
+    retval = cc_of_dev_register(devkey.controller_ip_addr,
+                                devkey.switch_ip_addr,
+                                devkey.controller_L4_port,
+                                CC_OFVER_1_3_1,
+                                dummy_recv_func);
+    g_test_message("retval from dev register is CC_OF_OK");
+    g_assert(retval == CC_OF_OK);
+
+    /* channel key setup */
+    chankey.aux_id = 0;
+
+    /* init random number generator */
+    random_gen = g_rand_new();    
+
+    /* create one unique dummy fd */
+    while (!fd_is_unique(testfd_arr, num_fds,
+                         (dummy_fd = g_rand_int_range(random_gen, 1, 1001))));
+    
+    testfd_arr[num_fds] = dummy_fd;
+    num_fds++;
+
+    chankey.dp_id = dummy_fd;
+    add_fd_msg.fd = dummy_fd;
+
+    print_ofdev_htbl();
+    retval = cc_add_sockfd_rw_pollthr(&add_fd_msg, devkey, TCP, chankey);
+
+    g_test_message("retval from add_sockfd_rw_pollthr is CC_OF_OK");
+    g_assert(retval == CC_OF_OK);
+
+    g_rand_free(random_gen);
+}
+
+//create listen thread in t
+
+
+
 #ifdef NOTYET
+
+char tc2_test_str_in[] = "util_tc_2: socket in test message";
+char tc2_test_str_out[] = "util_tc_2: socket out test message";
+
+// create a socket pair
+// add 1 rwsocket
+// exercise pollin and pollout
+// delete the rwsocket
+//util_tc_3
+
+//test SIZE_RW_THREAD_BUCKET
+//util_tc_4
+
+//test socket in/out data 
+
+void
+test_socket_in_process_func(char *tname,
+                            adpoll_fd_info_t *data_p,
+                            adpoll_send_msg_htbl_info_t *unused_data UNUSED)
+{
+    char in_str[100];
+
+    g_test_message("test - %s: thread name sent to callback is rwthr_1",
+                   __FUNCTION__);
+    g_assert_cmpstr(tname, ==, "rwthr_1");
+
+    g_test_message("test - %s: message received by polling thread on fd "
+                   "is \"test socket in \"", __FUNCTION__);
+    read(data_p->fd, &in_data, sizeof(in_data));
+    g_assert_cmpstr(in_data.msg, ==, "hello 1..2..3..10");
+
+    g_test_message("test - %s: fd info is valid", __FUNCTION__);
+    g_assert_cmpint(data_p->fd_type, ==, SOCKET);
+    g_assert(data_p->pollfd_entry_p != NULL);
+    g_assert(data_p->pollfd_entry_p->events & POLLIN);
+    g_assert(!(data_p->pollfd_entry_p->events & POLLOUT));
+}
+
+
+void
+test_socket_out_process_func(char *tname,
+                             adpoll_fd_info_t *data_p,
+                             adpoll_send_msg_htbl_info_t *htbl_out_data)
+{
+    test_fd_rd_wr_data_t out_data;
+    int out_data_size = 32;
+
+    g_test_message("test - %s: thread name sent to callback is thread_tc_4",
+                   __FUNCTION__);
+    g_assert_cmpstr(tname, ==, "thread_tc_4");
+
+    g_test_message("test - %s: fd info is valid", __FUNCTION__);
+    g_assert_cmpint(data_p->fd_type, ==, SOCKET);
+    g_assert(data_p->pollfd_entry_p != NULL);
+    g_assert(!(data_p->pollfd_entry_p->events & POLLIN));
+    g_assert(data_p->pollfd_entry_p->events & POLLOUT);
+    g_assert(htbl_out_data != NULL);
+    
+
+    if (htbl_out_data->data_size < 32) {
+        out_data_size = htbl_out_data->data_size;
+    }
+    
+    g_memmove(out_data.msg, htbl_out_data->data, out_data_size);
+
+    g_test_message("test - %s: writing to socket: \"%s\"",
+                   __FUNCTION__, out_data.msg);
+    
+    write(data_p->fd, &out_data, sizeof(out_data));
+
+    return;
+}
+
+
+
 /* pollin function for new pipe with newly defined message
  *  definition
  */
-typedef struct test_fd_rd_wr_data_ {
-    char msg[32];
-} test_fd_rd_wr_data_t;
-
 void
 test_pipe_in_process_func(char *tname,
                           adpoll_fd_info_t *data_p,
@@ -867,10 +1065,15 @@ int main(int argc, char **argv)
 {
     g_test_init(&argc, &argv, NULL);
 
-    g_test_add("/pollthread_util/tc_1",
+//    g_test_add("/util/tc_1",
+//               test_data_t,
+//               "rwthr_1",
+//               util_start, util_tc_1, util_end);
+
+    g_test_add("/util/tc_2",
                test_data_t,
-               "rwthr_1",
-               util_start, util_tc_1, util_end);
+              "rwthr_2",
+               util_start, util_tc_2, util_end);
     
     return g_test_run();
 }

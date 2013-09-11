@@ -345,6 +345,9 @@ cc_of_ret tcp_close(int sockfd)
     
     thr_msg.fd = sockfd;
     thr_msg.fd_type = SOCKET;
+    thr_msg.fd_action = DELETE_FD;
+
+    CC_LOG_DEBUG("%s(%d): Starting", __FUNCTION__, __LINE__);
 
     status = find_thrmgr_rwsocket(sockfd, &tmgr);
     if (status < 0) {

@@ -52,7 +52,6 @@ typedef struct cc_ofdev_info_ {
     cc_ofver_e     of_max_ver;  /* cc_ofver_e */
     
     GList          *ofrw_socket_list; //list of rw sockets
-    GMutex	       ofrw_socket_list_lock;
 
     cc_of_recv_pkt recv_func; /* cc_of_recv_pkt function ptr */
     cc_of_accept_channel accept_chann_func; /* cc_of_accept_channel func ptr */

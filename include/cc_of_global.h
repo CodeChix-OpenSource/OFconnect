@@ -36,6 +36,7 @@ typedef struct cc_of_global_ {
     adpoll_thread_mgr_t  *oflisten_pollthr_p; /* NULL for client */
     
     GList            *ofrw_pollthr_list; /* adpoll_thread_mgr elems */
+    GMutex           ofrw_pollthr_list_lock;
 
     /* debugs and log file */
     FILE             *oflog_fd;

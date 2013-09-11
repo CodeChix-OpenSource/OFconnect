@@ -11,7 +11,7 @@ extern net_svcs_t udp_sockfns;
 
 inline const char *cc_of_strerror(int errnum)
 {
-    if(errnum > 0) {
+    if (errnum > 0) {
 	    return "Invalid errnum";
     } else if (errnum <= -(int)CC_OF_ERRTABLE_SIZE){
 	    return "Unknown error";
@@ -45,6 +45,7 @@ cc_of_lib_init(of_dev_type_e dev_type)
     if (cc_of_global.ofdev_htbl == NULL) {
 	    status = CC_OF_EHTBL;
 	    cc_of_lib_free();
+
 	    CC_LOG_FATAL("%s(%d): %s", __FUNCTION__, __LINE__,
                      cc_of_strerror(status));
     }
@@ -170,10 +171,10 @@ cc_of_lib_free()
 
 cc_of_ret
 cc_of_dev_register(uint32_t controller_ipaddr, 
-                             uint32_t switch_ipaddr, 
-                             uint16_t controller_L4_port,
-                             cc_ofver_e max_ofver, 
-                             cc_of_recv_pkt recv_func) {
+                   uint32_t switch_ipaddr, 
+                   uint16_t controller_L4_port,
+                   cc_ofver_e max_ofver, 
+                   cc_of_recv_pkt recv_func) {
     cc_of_ret status = CC_OF_OK;
     cc_ofdev_key_t *key;
     gpointer ht_dev_key, ht_dev_info;
@@ -303,7 +304,7 @@ cc_of_dev_free(uint32_t controller_ip_addr,
     adpoll_thr_msg_t thr_msg;
     GList *elem = NULL;
     gboolean new_entry;
-//    adpoll_thread_mgr_t *tmgr = NULL;
+    adpoll_thread_mgr_t *tmgr = NULL;
 
     dkey = g_malloc0(sizeof(cc_ofdev_key_t));    
     dkey->controller_ip_addr = controller_ip_addr;
@@ -321,7 +322,7 @@ cc_of_dev_free(uint32_t controller_ip_addr,
     g_assert(g_hash_table_contains(cc_of_global.ofdev_htbl,
                                    dkey) == TRUE);
 
-    CC_LOG_DEBUG("%s(%d): looking up "
+    ("%s(%d): looking up "
                  "controller_ip-0x%x, switch_ip-0x%x,"
                  "controller_l4_port-%d",__FUNCTION__, __LINE__,
                  dkey->controller_ip_addr,
@@ -429,7 +430,6 @@ cc_of_dev_free(uint32_t controller_ip_addr,
     }
 
     // close main tcp listenfd and remove it from oflisten_pollthr.
-    // the main_sockfd_udp is part of ofrw_socket_list. It must be cleaned up already.
     thr_msg.fd = ht_dinfo->main_sockfd_tcp;
     thr_msg.fd_type = SOCKET;
     thr_msg.fd_action = DEL;
@@ -445,12 +445,29 @@ cc_of_dev_free(uint32_t controller_ip_addr,
                      __FUNCTION__, __LINE__, strerror(errno));
     }
 
+    // close main udp serverfd and remove it from its pollthr.
+    status = find_thrmgr_rwsocket(ht_dinfo->main_sockfd_udp, &tmgr);
+    if (status < 0) {
+        CC_LOG_ERROR("%s(%d): could not find tmgr for main_sockfd_udp - %d",
+                     __FUNCTION__, __LINE__, ht_dinfo->main_sockfd_udp);
+    }
+    thr_msg.fd = ht_dinfo->main_sockfd_udp;
+    thr_msg.fd_type = SOCKET;
+    thr_msg.fd_action = DEL;
+
+    status = adp_thr_mgr_add_del_fd(tmgr, &thr_msg);
+    if (status < 0) {
+        CC_LOG_ERROR("%s(%d):Error deleting udp_serverfd from its pollthr: %s",
+                     __FUNCTION__, __LINE__, cc_of_strerror(errno));
+    }
+    status = close(ht_dinfo->main_sockfd_udp);
+    if (status < 0) {
+        CC_LOG_ERROR("%s(%d):Error closing udp_serverfd: %s",
+                     __FUNCTION__, __LINE__, strerror(errno));
+    }
+
     // delete dev from devhtbl
-
     status = update_global_htbl(OFDEV, DEL, ht_dkey, NULL, &new_entry);
-
-
-    
     if (status < 0) {
         CC_LOG_ERROR("%s(%d): %s, Error while freeing dev"
                      "controller_ip-%s, switch_ip-%s,"

@@ -750,7 +750,7 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, adpoll_thr_msg_t *thr_msg)
                  __LINE__, tmgr->tname, thr_msg->fd,
                  (thr_msg->fd_type == PIPE)? "pipe":"socket");
 
-    if ((tmgr == NULL) || (thr_msg == NULL)) {
+    if (thr_msg == NULL) {
         CC_LOG_ERROR("%s(%d): invalid parameters",
                      __FUNCTION__, __LINE__);
         return CC_OF_EINVAL;
@@ -760,33 +760,37 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, adpoll_thr_msg_t *thr_msg)
                      __FUNCTION__, __LINE__);
         return CC_OF_EINVAL;
     }
-    
-    adp_thr_mgr_add_del_fd(tmgr, thr_msg);
-    
-    if (cc_get_count_rw_pollthr() == 1) {
-        // no sorting required with only 1 thread 
-        CC_LOG_DEBUG("%s(%d): only one poll thread. skip sorting",
-                     __FUNCTION__, __LINE__);
 
-    } else {
+    /* Dummy udp sockfds do not belong to any tmgr 
+     */
+    if (tmgr) {
+        adp_thr_mgr_add_del_fd(tmgr, thr_msg);
+    
+        if (cc_get_count_rw_pollthr() == 1) {
+            // no sorting required with only 1 thread 
+            CC_LOG_DEBUG("%s(%d): only one poll thread. skip sorting",
+                         __FUNCTION__, __LINE__);
+
+        } else {
+            
+            tmp_list = g_list_find(cc_of_global.ofrw_pollthr_list, tmgr);
+            if (tmp_list == NULL) {
+                CC_LOG_ERROR("%s(%d): could not find thread manager %s "
+                             "in ofrw_pollthr_list",
+                             __FUNCTION__, __LINE__, tmgr->tname);
+                return(CC_OF_EMISC);
+            }
         
-        tmp_list = g_list_find(cc_of_global.ofrw_pollthr_list, tmgr);
-        if (tmp_list == NULL) {
-            CC_LOG_ERROR("%s(%d): could not find thread manager %s "
-                         "in ofrw_pollthr_list",
-                         __FUNCTION__, __LINE__, tmgr->tname);
-            return(CC_OF_EMISC);
+            tmp_tmgr = (adpoll_thread_mgr_t *)tmp_list->data;
+            cc_of_global.ofrw_pollthr_list =
+                g_list_delete_link(cc_of_global.ofrw_pollthr_list, tmp_list);
+            free(tmp_tmgr);
+        
+            cc_of_global.ofrw_pollthr_list = g_list_insert_sorted(
+                cc_of_global.ofrw_pollthr_list,
+                tmgr,
+                (GCompareFunc)cc_pollthr_list_compare_func);
         }
-        
-        tmp_tmgr = (adpoll_thread_mgr_t *)tmp_list->data;
-        cc_of_global.ofrw_pollthr_list =
-            g_list_delete_link(cc_of_global.ofrw_pollthr_list, tmp_list);
-        free(tmp_tmgr);
-        
-        cc_of_global.ofrw_pollthr_list = g_list_insert_sorted(
-            cc_of_global.ofrw_pollthr_list,
-            tmgr,
-            (GCompareFunc)cc_pollthr_list_compare_func);
     }
     
     rwkey.rw_sockfd = thr_msg->fd;
@@ -842,10 +846,9 @@ cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key,
         adp_thr_mgr_add_del_fd(tmgr, thr_msg);
 
         print_ofdev_htbl();
-        /* add fd to global structures */
         CC_LOG_DEBUG("%s(%d): succesfully added fd %d to thread",
                      __FUNCTION__, __LINE__, thr_msg->fd);
-
+        /* add fd to global structures */
         status = atomic_add_upd_htbls_with_rwsocket(thr_msg->fd,
                                                     tmgr,
                                                     key, 

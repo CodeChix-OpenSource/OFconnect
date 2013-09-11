@@ -88,7 +88,7 @@ cc_of_ret
 del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock);
 
 cc_of_ret
-atomic_add_upd_htbls_with_rwsocket(int sockfd, 
+atomic_add_upd_htbls_with_rwsocket(int sockfd, struct sockaddr_in *client_addr, 
                                    adpoll_thread_mgr_t  *thr_mgr,
                                    cc_ofdev_key_t key,
                                    L4_type_e layer4_proto, 

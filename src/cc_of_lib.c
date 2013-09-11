@@ -174,7 +174,10 @@ cc_of_dev_register(uint32_t controller_ipaddr,
                    uint32_t switch_ipaddr, 
                    uint16_t controller_L4_port,
                    cc_ofver_e max_ofver, 
-                   cc_of_recv_pkt recv_func) {
+                   cc_of_recv_pkt recv_func,
+                   cc_of_accept_channel accept_func,
+                   cc_of_delete_channel del_func)
+{
     cc_of_ret status = CC_OF_OK;
     cc_ofdev_key_t *key;
     gpointer ht_dev_key, ht_dev_info;
@@ -223,7 +226,8 @@ cc_of_dev_register(uint32_t controller_ipaddr,
     g_mutex_init(&dev_info->ofrw_socket_list_lock);
 
     dev_info->recv_func = recv_func;
-
+    dev_info->accept_chann_func = accept_func;
+    dev_info->del_chann_func = del_func; 
 
     if (cc_of_global.ofdev_type == CONTROLLER) {
 
@@ -430,7 +434,6 @@ cc_of_dev_free(uint32_t controller_ip_addr,
                      __FUNCTION__, __LINE__, strerror(errno));
     }
 
-<<<<<<< HEAD
     // close main udp serverfd and remove it from its pollthr.
     status = find_thrmgr_rwsocket(ht_dinfo->main_sockfd_udp, &tmgr);
     if (status < 0) {

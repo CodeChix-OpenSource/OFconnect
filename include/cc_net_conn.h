@@ -6,9 +6,13 @@
 
 #include "cc_pollthr_mgr.h"
 #include "cc_of_lib.h"
+#include <netinet/in.h>
 
-#define MAXBUF 65535
-/* Is this optimal? */
+#define MAXBUF 65535 /* Is this optimal? */
+#define MAX_OPEN_FILES 1024 * 1024 
+/* For most of the systems(32/64 bit) have this as 
+ * hard limit for max files open. 
+ */
 
 typedef uint32_t ipaddr_v4_t;
 typedef ipaddr_v4_t ipaddr_v4v6_t;
@@ -71,6 +75,7 @@ typedef struct cc_ofrw_info_ {
     /* needed for easier lookup of device given the rwsocket */
     cc_ofdev_key_t       dev_key;
     L4_type_e            layer4_proto;
+    struct sockaddr_in   client_addr; /* needed for UDP connections */
     adpoll_thread_mgr_t  *thr_mgr_p;
 } cc_ofrw_info_t;
 

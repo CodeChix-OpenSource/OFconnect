@@ -121,8 +121,8 @@ cc_of_lib_free()
         cc_ofdev_info_t *dev_info;
 
         g_hash_table_iter_init(&ofdev_iter, cc_of_global.ofdev_htbl);
-        if (g_hash_table_iter_next(&ofdev_iter, (gpointer *)&dev_key, 
-                                   (gpointer *)&dev_info)) {
+        while (g_hash_table_iter_next(&ofdev_iter, (gpointer *)&dev_key, 
+                                      (gpointer *)&dev_info)) {
             status = cc_of_dev_free(dev_key->controller_ip_addr, 
                                     dev_key->switch_ip_addr,
                                     dev_key->controller_L4_port);
@@ -326,7 +326,7 @@ cc_of_dev_free(uint32_t controller_ip_addr,
     g_assert(g_hash_table_contains(cc_of_global.ofdev_htbl,
                                    dkey) == TRUE);
 
-    ("%s(%d): looking up "
+    CC_LOG_DEBUG("%s(%d): looking up "
                  "controller_ip-0x%x, switch_ip-0x%x,"
                  "controller_l4_port-%d",__FUNCTION__, __LINE__,
                  dkey->controller_ip_addr,

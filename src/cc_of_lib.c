@@ -120,8 +120,8 @@ cc_of_lib_free()
         cc_ofdev_info_t *dev_info;
 
         g_hash_table_iter_init(&ofdev_iter, cc_of_global.ofdev_htbl);
-        if (g_hash_table_iter_next(&ofdev_iter, (gpointer *)&dev_key, 
-                                   (gpointer *)&dev_info)) {
+        while (g_hash_table_iter_next(&ofdev_iter, (gpointer *)&dev_key, 
+                                      (gpointer *)&dev_info)) {
             status = cc_of_dev_free(dev_key->controller_ip_addr, 
                                     dev_key->switch_ip_addr,
                                     dev_key->controller_L4_port);

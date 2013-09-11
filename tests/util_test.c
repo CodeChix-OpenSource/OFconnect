@@ -80,12 +80,13 @@ util_start(test_data_t *tdata,
     cc_of_global.oflog_fd = NULL;
     cc_of_global.oflog_file = malloc(sizeof(char) *
                                      LOG_FILE_NAME_SIZE);
-    cc_of_debug_toggle(TRUE);    //enable if debugging test code
-    cc_of_log_toggle(TRUE);
     g_mutex_init(&cc_of_global.oflog_lock);
     g_mutex_init(&cc_of_global.ofdev_htbl_lock);
     g_mutex_init(&cc_of_global.ofchannel_htbl_lock);
     g_mutex_init(&cc_of_global.ofrw_htbl_lock);
+    
+//    cc_of_debug_toggle(TRUE);    //enable if debugging test code
+    cc_of_log_toggle(TRUE);
     
     cc_of_global.oflisten_pollthr_p = NULL;
     cc_of_global.ofrw_pollthr_list = NULL;
@@ -302,27 +303,25 @@ int dummy_recv_func(uint64_t dp_id UNUSED,
     return 1;
 }
 
-#define TCPCLIENT 1
 
 // test cc_find_or_create_rw_pollthr
 // cc_del_sockfd_rw_pollthr and cc_add_sockfd_rw_pollthr
-// add MAX_PER_THREAD_RWSOCKETS - 1 fds - total threads: 1
-// + 1 fd - total threads: 1
-// +1 fd - total threads: 2
-// -2 fd - total threads: 1
-
+// test connect to listen socket and accept new conn
+// test dev_free
+// test TCP net svcs listen accept
+//
+//Expected: 3 poll fds on oflisten_thr
+//(2 primary + 1 listen fd)
+//Expected: 4 poll fds on ofrw_thr
+//(2 primary + 1 connect + 1 accept)
 static void
 util_tc_2(test_data_t *tdata, gconstpointer tudata)
 {
-
-    gint32 dummy_fd;
-    gint32 testfd_arr[1000]; // to check for uniqueness of generated fds
-    gint32 num_fds = 0;
     adpoll_thr_msg_t add_fd_msg;
     cc_ofdev_key_t devkey;
-    cc_ofchannel_key_t chankey;
     cc_of_ret retval;
 
+    cc_of_debug_toggle(TRUE);    //enable if debugging test code    
     /* add_fd_msg setup */
     add_fd_msg.fd_type = SOCKET;
     add_fd_msg.fd_action = ADD_FD;
@@ -344,13 +343,9 @@ util_tc_2(test_data_t *tdata, gconstpointer tudata)
     g_test_message("retval from dev register is CC_OF_OK");
     g_assert(retval == CC_OF_OK);
 
-    /* channel key setup */
-    chankey.aux_id = 0;
-
    //start a connection and try to connect with listen fd
    //socket(); connect() - use the code in cc_tcp_conn
     
-#ifdef TCPCLIENT
     {
     int clientfd;
     cc_of_ret client_status = CC_OF_OK;
@@ -358,6 +353,10 @@ util_tc_2(test_data_t *tdata, gconstpointer tudata)
     struct sockaddr_in serveraddr, localaddr;
     cc_ofchannel_key_t ofchann_key;
 
+    /* this is not being set for controller.
+       atomic_add_upd_htbls_with_rwsocket() hardcodes
+       these to socket fd for CONTROLLEr
+    */
     ofchann_key.dp_id = 101001000;
     ofchann_key.aux_id = 0;
 
@@ -416,33 +415,7 @@ util_tc_2(test_data_t *tdata, gconstpointer tudata)
     }
     
     }
-    #endif
     
-    #if 0
-    GRand *random_gen = NULL;
-    /* init random number generator */
-    random_gen = g_rand_new();    
-
-    
-    /* create one unique dummy fd */
-    while (!fd_is_unique(testfd_arr, num_fds,
-                         (dummy_fd = g_rand_int_range(random_gen, 1, 1001))));
-    
-    testfd_arr[num_fds] = dummy_fd;
-    num_fds++;
-
-    chankey.dp_id = dummy_fd;
-    add_fd_msg.fd = dummy_fd;
-
-    print_ofdev_htbl();
-    retval = cc_add_sockfd_rw_pollthr(&add_fd_msg, devkey, TCP, chankey);
-
-    g_test_message("retval from add_sockfd_rw_pollthr is CC_OF_OK");
-
-    g_assert(retval == CC_OF_OK);
-    g_rand_free(random_gen);
-    #endif
-
     CC_LOG_DEBUG("zzzzzzzzzzzzzzzzzzzzzz");
     /* sleep for sometime to allow the polling thread
        to process the receive
@@ -453,61 +426,56 @@ util_tc_2(test_data_t *tdata, gconstpointer tudata)
 
 }
 
-//create listen thread in t
 
+char payload_str[] = "util_tc_3: rwsocket under test message";
+//char tc3_test_str_out[] = "util_tc_3: socket out test message";
 
-
-#ifdef NOTYET
-
-char tc2_test_str_in[] = "util_tc_2: socket in test message";
-char tc2_test_str_out[] = "util_tc_2: socket out test message";
-
+//util_tc_3
+// tc_2 + test tcp net svcs pollin and pollout functions
+//
+// details:
 // create a socket pair
 // add 1 rwsocket
-// exercise pollin and pollout
+// exercise tcp pollin and pollout and listen pollin
 // delete the rwsocket
-//util_tc_3
+// test connect to listen socket and accept new conn
+// test pollout and pollin func on rwsocket establised
+// test dev_free
+// test TCP net svcs listen accept
 
-//test SIZE_RW_THREAD_BUCKET
-//util_tc_4
 
-//test socket in/out data 
+//Expected: 3 poll fds on oflisten_thr
+//(2 primary + 1 listen fd)
+//Expected: 4 poll fds on ofrw_thr
+//(2 primary + 1 connect + 1 accept)
 
-void
-test_socket_in_process_func(char *tname,
-                            adpoll_fd_info_t *data_p,
-                            adpoll_send_msg_htbl_info_t *unused_data UNUSED)
+int
+receive_packet_process_func(uint64_t dp_id, uint8_t aux_id,
+                            void *of_msg, 
+                            size_t of_msg_len)
 {
     char in_str[100];
-
-    g_test_message("test - %s: thread name sent to callback is rwthr_1",
-                   __FUNCTION__);
-    g_assert_cmpstr(tname, ==, "rwthr_1");
-
-    g_test_message("test - %s: message received by polling thread on fd "
-                   "is \"test socket in \"", __FUNCTION__);
-    read(data_p->fd, &in_data, sizeof(in_data));
-    g_assert_cmpstr(in_data.msg, ==, "hello 1..2..3..10");
-
-    g_test_message("test - %s: fd info is valid", __FUNCTION__);
-    g_assert_cmpint(data_p->fd_type, ==, SOCKET);
-    g_assert(data_p->pollfd_entry_p != NULL);
-    g_assert(data_p->pollfd_entry_p->events & POLLIN);
-    g_assert(!(data_p->pollfd_entry_p->events & POLLOUT));
+    g_test_message("test - %s: message received by receive process CALLBACK API "
+                   "is \"%s\"", __FUNCTION__, payload_str);
+    g_memmove(in_str,of_msg,of_msg_len);
+    in_str[of_msg_len] = 0;
+    CC_LOG_DEBUG("%s: WOOOHOOOO message received %s", in_str);
+    return 1;
 }
 
-
+/*
+#define SEND_BUF_SIZE 100
 void
 test_socket_out_process_func(char *tname,
                              adpoll_fd_info_t *data_p,
                              adpoll_send_msg_htbl_info_t *htbl_out_data)
 {
-    test_fd_rd_wr_data_t out_data;
-    int out_data_size = 32;
-
-    g_test_message("test - %s: thread name sent to callback is thread_tc_4",
+    char out_str[SEND_BUF_SIZE];
+    int out_msg_size;
+    
+    g_test_message("test - %s: thread name sent to callback is rwthr_1",
                    __FUNCTION__);
-    g_assert_cmpstr(tname, ==, "thread_tc_4");
+    g_assert_cmpstr(tname, ==, "rwthr_1");
 
     g_test_message("test - %s: fd info is valid", __FUNCTION__);
     g_assert_cmpint(data_p->fd_type, ==, SOCKET);
@@ -517,11 +485,11 @@ test_socket_out_process_func(char *tname,
     g_assert(htbl_out_data != NULL);
     
 
-    if (htbl_out_data->data_size < 32) {
-        out_data_size = htbl_out_data->data_size;
+    if (htbl_out_data->data_size < SEND_BUF_SIZE) {
+        out_msg_size = htbl_out_data->data_size;
     }
     
-    g_memmove(out_data.msg, htbl_out_data->data, out_data_size);
+    g_memmove(out_str, htbl_out_data->data, out_msg_size);
 
     g_test_message("test - %s: writing to socket: \"%s\"",
                    __FUNCTION__, out_data.msg);
@@ -530,36 +498,161 @@ test_socket_out_process_func(char *tname,
 
     return;
 }
+*/
 
 
 
-/* pollin function for new pipe with newly defined message
- *  definition
- */
-void
-test_pipe_in_process_func(char *tname,
-                          adpoll_fd_info_t *data_p,
-                          adpoll_send_msg_htbl_info_t *unused_data UNUSED)
+//register the recv pkt callback
+// do not use fixture data
+static void
+util_tc_3(test_data_t *tdata UNUSED, gconstpointer tudata)
 {
-    test_fd_rd_wr_data_t in_data;
-    
-    g_test_message("test - %s: thread name sent to callback is thread_tc_2",
-                   __FUNCTION__);
-    g_assert_cmpstr(tname, ==, "thread_tc_2");
-    
-    g_test_message("test - %s: message received by polling thread on fd "
-                   "is \"hello 1..2..3\"", __FUNCTION__);
-    read(data_p->fd, &in_data, sizeof(in_data));
-    g_assert_cmpstr(in_data.msg, ==, "hello 1..2..3");
 
-    g_test_message("test - %s: fd info is valid", __FUNCTION__);
-    g_assert_cmpint(data_p->fd_type, ==, PIPE);
-    g_assert(data_p->pollfd_entry_p != NULL);
-    g_assert(data_p->pollfd_entry_p->events & POLLIN);
-    g_assert(!(data_p->pollfd_entry_p->events & POLLOUT));
+    gint32 dummy_fd;
+    gint32 num_fds = 0;
+    cc_ofdev_key_t devkey;
+    cc_of_ret retval;
+    char send_buf[1024];
+    int clientfd;
+    cc_of_ret client_status = CC_OF_OK;
+    int optval = 1;
+    struct sockaddr_in serveraddr, localaddr;
+    cc_ofchannel_key_t ofchann_key;
+    adpoll_thread_mgr_t *tmgr = NULL;
+    int datapipe_fd;
+    
+    cc_of_debug_toggle(TRUE);    //enable if debugging test code    
+    /* device setup */
+    /* ip address 127.0.0.1 */
+    devkey.controller_ip_addr = 0x7F000001;
+    devkey.switch_ip_addr = 0x7F000001;
+    devkey.controller_L4_port = 6633;
+
+    retval = cc_of_dev_register(devkey.controller_ip_addr,
+                                devkey.switch_ip_addr,
+                                devkey.controller_L4_port,
+                                CC_OFVER_1_3_1,
+                                receive_packet_process_func);
+    g_test_message("retval from dev register is CC_OF_OK");
+    g_assert(retval == CC_OF_OK);
+
+    // wait till listen is up
+    g_usleep(100000); //1 million microseconds is 1 sec
+    
+    //start a connection and try to connect with listen fd
+    //socket(); connect() - use the code in cc_tcp_conn
+    //manually establish client fd for writing
+    {
+    ofchann_key.dp_id = 101001000;
+    ofchann_key.aux_id = 0;
+
+    if ((clientfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__,
+                     strerror(errno));
+    }
+
+    CC_LOG_DEBUG("%s(%d): NEW CLIENT SOCKET %d",
+                 __FUNCTION__, __LINE__, clientfd);
+
+    // To prevent "Address already in use" error from bind
+    if ((client_status = setsockopt(clientfd, SOL_SOCKET,SO_REUSEADDR, 
+                             (const void *)&optval, sizeof(int))) < 0) {
+        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
+                     strerror(errno));
+    }
+    memset(&localaddr, 0, sizeof(localaddr));
+    localaddr.sin_family = AF_INET;
+    localaddr.sin_addr.s_addr = htonl(devkey.switch_ip_addr);
+    localaddr.sin_port = 0;
+    
+    // Bind clienfd to a local interface addr
+    if ((client_status = bind(clientfd, (struct sockaddr *) &localaddr, 
+                       sizeof(localaddr))) < 0) {
+	    CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
+    }
+ 
+    memset(&serveraddr, 0, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(devkey.controller_ip_addr);
+    serveraddr.sin_port = htons(devkey.controller_L4_port);
+
+    // Establish connection with server
+    if ((client_status = connect(clientfd, (struct sockaddr *) &serveraddr, 
+                                 sizeof(serveraddr))) < 0) {
+        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
+    }
+    
+    // Add clientfd to a thr_mgr and update it in ofrw, ofdev htbls
+    // we don't need to do this step if we use create_channel api
+    adpoll_thr_msg_t thr_msg;
+
+    thr_msg.fd = clientfd;
+    thr_msg.fd_type = SOCKET;
+    thr_msg.fd_action = ADD;
+    thr_msg.poll_events = POLLIN | POLLOUT;
+    thr_msg.pollin_func = &process_tcpfd_pollin_func;
+    thr_msg.pollout_func = &process_tcpfd_pollout_func;
+    
+    client_status = cc_add_sockfd_rw_pollthr(&thr_msg, devkey, TCP, ofchann_key);
+    if (client_status < 0) {
+        CC_LOG_ERROR("%s(%d):Error updating tcp sockfd in global structures: %s",
+                     __FUNCTION__, __LINE__, cc_of_strerror(errno));
+        close(clientfd);
+    }
+    
+    }
+    
+    CC_LOG_DEBUG("zzzzzzzzzzzzzzzzzzzzzz");
+    /* sleep for sometime to allow the polling thread
+       to process the receive the connection and accept
+    */
+    g_usleep(2000000); //1 million microseconds is 1 sec
+    CC_LOG_DEBUG("zzzzzzzzzzzzzzzzzzzzzz");
+
+
+    /* now write to the client FD and test on pollin for RW FD */
+    ((adpoll_send_msg_t *)send_buf)->hdr.msg_size =
+        sizeof(adpoll_send_msg_t) + strlen(payload_str) + 1;
+    
+    ((adpoll_send_msg_t *)send_buf)->hdr.fd = clientfd;
+    
+    g_memmove(((adpoll_send_msg_t *)send_buf)->data,
+              payload_str, strlen(payload_str) + 1);
+
+    find_thrmgr_rwsocket(clientfd, &tmgr);
+
+    g_assert_cmpstr(tmgr->tname, ==, "rwthr_1");
+
+    CC_LOG_DEBUG("%s(%d) found the rw thread for client sockfd %d",
+                 __FUNCTION__, __LINE__, clientfd);
+
+    if (tmgr == NULL) {
+        CC_LOG_ERROR("%s(%d): socket %d is invalid",
+                     __FUNCTION__, __LINE__, clientfd);
+    }
+    datapipe_fd = adp_thr_mgr_get_data_pipe_wr(tmgr);
+    
+    write(datapipe_fd, send_buf,
+          ((adpoll_send_msg_t *)send_buf)->hdr.msg_size);
+
+    CC_LOG_DEBUG("%s(%d): wrote to data pipe %d", __FUNCTION__, __LINE__, datapipe_fd);
+
+    CC_LOG_DEBUG("%s====SNOOZE FOR MESSAGE TO PLUMB THROUGH====",
+                 __FUNCTION__);
+    
+    /* snooze */
+    g_usleep(20000000);
+    CC_LOG_DEBUG("%s - ALL DONE", __FUNCTION__);
 }
 
 
+#ifdef NOTYET
+//test SIZE_RW_THREAD_BUCKET
+//util_tc_4
+// test TCP net svcs connect API
+
+//util_tc_5
+// create channel API
 
 //tc_2 - exercise the primary pipe - add/del pipe
 //     - exercise the callback function sent for pollin/pollout
@@ -1163,40 +1256,22 @@ int main(int argc, char **argv)
 {
     g_test_init(&argc, &argv, NULL);
 
-//    g_test_add("/util/tc_1",
-//               test_data_t,
-//               "rwthr_1",
-//               util_start, util_tc_1, util_end);
+    g_test_add("/util/tc_1",
+               test_data_t,
+               "rwthr_1",
+               util_start, util_tc_1, util_end);
 
     g_test_add("/util/tc_2",
                test_data_t,
-              "rwthr_2",
+              "rwthr_1",
                util_start, util_tc_2, util_end);
+
+
+    g_test_add("/util/tc_3",
+               test_data_t,
+              "rwthr_1",
+               util_start, util_tc_3, util_end);
     
     return g_test_run();
 }
 
-#ifdef NOTYET
-    g_test_add("/pollthread/tc_2",
-               test_data_t,
-               "thread_tc_2",
-               pollthread_start, pollthread_tc_2, pollthread_end);
-
-    g_test_add("/pollthread/tc_3",
-               test_data_t,
-               "thread_tc_3",
-               pollthread_start, pollthread_tc_3, pollthread_end);
-
-    g_test_add("/pollthread/tc_4",
-               test_data_t,
-               "thread_tc_4",
-               pollthread_start, pollthread_tc_4, pollthread_end);
-    
-    g_test_add("/pollthread/tc_5",
-               test_data_t,
-               "thread_tc_5",
-               pollthread_start, pollthread_tc_5, NULL);
-
-    return g_test_run();
-}
-#endif

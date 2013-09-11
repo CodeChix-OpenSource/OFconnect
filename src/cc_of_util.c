@@ -86,6 +86,11 @@ gboolean cc_ofchannel_htbl_equal_func(gconstpointer a, gconstpointer b)
     a_chan = (cc_ofchannel_key_t *)a;
     b_chan = (cc_ofchannel_key_t *)b;
 
+    CC_LOG_DEBUG("%s: a dp/aux %lu/%hu b is %lu/%hu",
+                 __FUNCTION__,
+                 a_chan->dp_id, a_chan->aux_id,
+                 b_chan->dp_id, b_chan->aux_id);
+    
     if ((a_chan->dp_id == b_chan->dp_id) &&
         (a_chan->aux_id == b_chan->aux_id)) {
          return TRUE;
@@ -206,7 +211,13 @@ update_global_htbl(htbl_type_e htbl_type,
                              __FUNCTION__, __LINE__,
                              ((cc_ofrw_key_t *)htbl_key)->rw_sockfd);
             }
+        } else if (htbl_type == OFCHANN) {
+            CC_LOG_DEBUG("%s(%d) ofchannel key dp/aux %lu/%hu",
+                         __FUNCTION__, __LINE__,
+                         ((cc_ofchannel_key_t *)htbl_key)->dp_id,
+                         ((cc_ofchannel_key_t *)htbl_key)->aux_id);
         }
+
 
         g_hash_table_insert(cc_htbl, htbl_key, htbl_data);
 
@@ -252,7 +263,9 @@ update_global_htbl(htbl_type_e htbl_type,
             CC_LOG_DEBUG("%s(%d) key has socket %d",
                          __FUNCTION__, __LINE__,
                          ((cc_ofrw_key_t *)htbl_key)->rw_sockfd);
-        } 
+        } else {
+            print_ofchann_htbl();
+        }
         
         if (g_hash_table_size(cc_htbl) > old_count) {
             *new_entry = TRUE;
@@ -283,10 +296,12 @@ update_global_htbl(htbl_type_e htbl_type,
                          ((cc_ofdev_key_t *)key)->controller_L4_port);
         }
         g_hash_table_insert(cc_htbl, key, info_data);
-        print_ofdev_htbl();
-        print_ofrw_htbl();
 
-        if (htbl_type == OFRW) {
+        if (htbl_type == OFDEV) {        
+            print_ofdev_htbl();
+        } else if (htbl_type == OFCHANN) {
+            print_ofchann_htbl();
+        } else if (htbl_type == OFRW) {
             gpointer rwht_key = NULL, rwht_info = NULL;
             if (g_hash_table_contains(cc_htbl, htbl_key)) {
                 CC_LOG_DEBUG("(%s(%d): OFRW htbl contains %d",
@@ -346,7 +361,7 @@ print_ofdev_htbl(void)
     GList *list_elem = NULL;
 
     CC_LOG_INFO("Printing ofdev Hash Table");
-    if (g_hash_table_iter_next(&ofdev_iter,
+    while (g_hash_table_iter_next(&ofdev_iter,
                                (gpointer *)&dev_key,
                                (gpointer *)&dev_info)) {
         CC_LOG_INFO("key: controller ip: 0x%x "
@@ -376,8 +391,8 @@ print_ofrw_htbl(void)
     g_hash_table_iter_init(&ofrw_iter, cc_of_global.ofrw_htbl);
     
     CC_LOG_INFO("Printing ofrw Hash Table");
-    if (g_hash_table_iter_next(&ofrw_iter,
-                               &rkey, &rinfo)) {
+    while (g_hash_table_iter_next(&ofrw_iter,
+                                  &rkey, &rinfo)) {
 //                               (gpointer *)&rw_key,
 //                               (gpointer *)&rw_info)) {
         rw_info = (cc_ofrw_info_t *)rinfo;
@@ -401,6 +416,28 @@ print_ofrw_htbl(void)
         }
     }
 }
+
+void
+print_ofchann_htbl(void)
+{
+    GHashTableIter ofch_iter;
+    cc_ofchannel_key_t *ch_key = NULL;
+    cc_ofchannel_info_t *ch_info = NULL;
+    g_hash_table_iter_init(&ofch_iter, cc_of_global.ofchannel_htbl);
+    GList *list_elem = NULL;
+
+    CC_LOG_INFO("Printing ofchannel Hash Table");
+    while (g_hash_table_iter_next(&ofch_iter,
+                               (gpointer *)&ch_key,
+                               (gpointer *)&ch_info)) {
+        CC_LOG_INFO("key: dp id: %lu "
+                    "key: aux id: %hu "
+                    "info: socket: %d",
+                    ch_key->dp_id,
+                    ch_key->aux_id,
+                    ch_info->rw_sockfd);
+    }
+}    
 
 cc_of_ret
 del_ofrw_rwsocket(int del_fd)
@@ -534,7 +571,7 @@ find_ofchann_key_rwsocket(int sockfd, cc_ofchannel_key_t **fd_chann_key) {
      */
 
     g_hash_table_iter_init(&ofchannel_iter, cc_of_global.ofchannel_htbl);
-    if (g_hash_table_iter_next(&ofchannel_iter, (gpointer *)&channel_key, (gpointer *)&channel_info)) {
+    while (g_hash_table_iter_next(&ofchannel_iter, (gpointer *)&channel_key, (gpointer *)&channel_info)) {
         if (channel_info->rw_sockfd == sockfd) {
             channel_key_tmp = channel_key;
         }

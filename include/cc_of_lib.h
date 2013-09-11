@@ -100,12 +100,8 @@ typedef int (*cc_of_recv_pkt)(uint64_t dp_id, uint8_t aux_id,
  * 01. This will be a callback. 
  *
  */
-typedef int (*cc_of_accept)(uint64_t dummy_dpid,
-                            uint8_t dummy_auxid,
-                            uint32_t controller_ip, /* Device on which we 
-                                                       got this new conn */
-                            uint32_t switch_ip,
-                            uint16_t controller_L4_port);
+typedef int (*cc_of_accept_channel)(uint64_t dummy_dpid,
+                                    uint8_t dummy_auxid);
 
 
 /**
@@ -156,7 +152,9 @@ cc_of_dev_register(uint32_t controller_ip,
                    uint32_t switch_ip,
                    uint16_t controller_L4_port,
                    cc_ofver_e max_ofver,
-                   cc_of_recv_pkt recv_func /*func ptr*/);
+                   cc_of_recv_pkt recv_func /*func ptr*/,
+                   cc_of_accept_channel accept_func,
+                   cc_of_delete_channel del_func);
 /* possible additional fields for TLS certificate */
 
 cc_of_ret

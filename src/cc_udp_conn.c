@@ -35,6 +35,7 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
     struct sockaddr_in src_addr;
     socklen_t addrlen;
     static uint32_t random = MAX_OPEN_FILES;
+    gboolean new_conn = TRUE;
     
     if (data_p == NULL) {
         CC_LOG_ERROR("%s(%d): received NULL data",
@@ -60,7 +61,6 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
         GHashTableIter ofrw_iter;
         cc_ofrw_key_t *rw_key;
         cc_ofrw_info_t *rw_info;
-        gboolean exists = FALSE;
 
         /* Look up ofrw_htbl to see if this src_addr is an old/new connection */
         g_hash_table_iter_init(&ofrw_iter, cc_of_global.ofrw_htbl);
@@ -70,7 +70,7 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
             if ((rw_info->client_addr.sin_addr.s_addr == 
                  ntohl(src_addr.sin_addr.s_addr)) && (rw_info->client_addr.sin_port
                  == ntohs(src_addr.sin_port))) {
-                exists = TRUE;
+                new_conn = FALSE;
                 dummy_udp_sockfd = rw_key->rw_sockfd;
                 CC_LOG_ERROR("%s(%d):, Not a new connection",
                              __FUNCTION__, __LINE__);
@@ -84,7 +84,7 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
          * Once, the controller get the OFPT_FEATURES_REQ message the real
          * dp_id/aux_id for this channel willbe determined and updated.
          */
-        if (!exists) {
+        if (new_conn) {
             random++;
             dummy_udp_sockfd = random;
             cc_ofrw_key_t tmp_rwkey;
@@ -105,14 +105,14 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
             }
             ofchann_key.dp_id = dummy_udp_sockfd;
             ofchann_key.aux_id = dummy_udp_sockfd;
-            /*Copy srcaddr and add here */
-            atomic_add_upd_htbls_with_rwsocket(dummy_udp_sockfd, NULL, 
-                                               tmp_rwinfo->dev_key, UDP,
-                                               ofchann_key);
+            atomic_add_upd_htbls_with_rwsocket(dummy_udp_sockfd, &src_addr, 
+                                               NULL, tmp_rwinfo->dev_key, 
+                                               UDP, ofchann_key);
+
         }
         /* If CONTROLLER, use dummysockfd for htbl lookups instead of the
          * main_sockfd_udp of the device. If SWITCH, each connection will
-         * a new sockfd which is udp_sockfd itself.
+         * have a new sockfd which is udp_sockfd itself.
          */
         udp_sockfd = dummy_udp_sockfd;
     }
@@ -141,6 +141,11 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
         CC_LOG_ERROR("%s(%d): could not find devinfo in ofdev_htbl"
                      "for device", __FUNCTION__, __LINE__);
         return;
+    }
+
+    if (new_conn) {
+        /* Notify the controller about the new UDP channel */
+        devinfo->accept_chann_func(fd_chann_key->dp_id, fd_chann_key->aux_id);
     }
 
     /* Send data to controller/switch via their callback */

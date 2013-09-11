@@ -256,7 +256,6 @@ cc_of_ret tcp_open_clientfd(cc_ofdev_key_t key, cc_ofchannel_key_t ofchann_key)
 	    close(clientfd);
 	    return status;
     }
-
     return clientfd;
 }
 
@@ -330,6 +329,7 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
     socklen_t addrlen = sizeof(struct sockaddr_in);
     adpoll_thr_msg_t thr_msg;
     cc_ofdev_key_t dev_key;
+    cc_ofdev_info_t *dev_info;
     cc_ofchannel_key_t chann_key;
     struct timeval timeout;
     int sockflags;
@@ -379,6 +379,16 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
 	    close(connfd);
 	    return status;
     }
+
+    dev_info = g_hash_table_lookup(cc_of_global.ofdev_htbl, &dev_key);
+    if (dev_info == NULL) {
+        CC_LOG_ERROR("%s(%d): could not find devinfo in ofdev_htbl"
+                     "for device", __FUNCTION__, __LINE__);
+        return CC_OF_EHTBL;
+    }
+
+    /* Notify the controller about the new TCP channel */
+    dev_info->accept_chann_func((uint64_t)connfd, (uint8_t)connfd);
 
     return connfd;
 }

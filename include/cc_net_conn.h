@@ -72,11 +72,11 @@ typedef struct cc_ofrw_key_ {
 /* node in ofrw_htbl */
 typedef struct cc_ofrw_info_ {
     cc_ofrw_state_e      state;
-    adpoll_thread_mgr_t  *thr_mgr_p;
-    cc_ofdev_key_t       dev_key;   /* needed for easier lookup of
-                                       device given the rwsocket */
+    /* needed for easier lookup of device given the rwsocket */
+    cc_ofdev_key_t       dev_key;
     L4_type_e            layer4_proto;
     struct sockaddr_in   client_addr; /* needed for UDP connections */
+    adpoll_thread_mgr_t  *thr_mgr_p;
 } cc_ofrw_info_t;
 
 typedef struct net_svcs_ {

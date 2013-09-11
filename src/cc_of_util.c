@@ -237,9 +237,9 @@ update_global_htbl(htbl_type_e htbl_type,
                 CC_LOG_DEBUG("extended lookup passed");
                 CC_LOG_INFO("key: rw_sockfd: %d "
                             "info: layer4_proto: %s "
-                            "info: poll thread name: %s",
-                            "info: devkey controller ip: 0x%x",
-                            "info: devkey switch ip: 0x%x",
+                            "info: poll thread name: %s"
+                            "info: devkey controller ip: 0x%x"
+                            "info: devkey switch ip: 0x%x"
                             "info: devkey l4port: %d",
                             rw_key->rw_sockfd,
                             (rw_info->layer4_proto == TCP)? "TCP":"UDP",
@@ -259,6 +259,7 @@ update_global_htbl(htbl_type_e htbl_type,
         }
         
     } else if (htbl_op == DEL) {
+        CC_LOG_DEBUG("%s(%d).. HTBL DEL ", __FUNCTION__, __LINE__);
         if (g_hash_table_contains(cc_htbl, htbl_key)) {
             CC_LOG_DEBUG("%s(%d) DEL operation found entry",
                          __FUNCTION__, __LINE__);
@@ -283,6 +284,47 @@ update_global_htbl(htbl_type_e htbl_type,
         }
         g_hash_table_insert(cc_htbl, key, info_data);
         print_ofdev_htbl();
+        print_ofrw_htbl();
+
+        if (htbl_type == OFRW) {
+            gpointer rwht_key = NULL, rwht_info = NULL;
+            if (g_hash_table_contains(cc_htbl, htbl_key)) {
+                CC_LOG_DEBUG("(%s(%d): OFRW htbl contains %d",
+                             __FUNCTION__, __LINE__,
+                             ((cc_ofrw_key_t *)htbl_key)->rw_sockfd);
+            }
+            CC_LOG_DEBUG("OFRW htbl size after insert of %d: %d",
+                         ((cc_ofrw_key_t *)htbl_key)->rw_sockfd,
+                         g_hash_table_size(cc_htbl));
+            
+            print_ofrw_htbl();
+            
+            if (g_hash_table_lookup_extended(cc_of_global.ofrw_htbl,
+                                             htbl_key,
+                                             &rwht_key, &rwht_info)
+                == FALSE) {
+                CC_LOG_DEBUG("extended lookup failed");
+            } else {
+                cc_ofrw_key_t *rw_key =  NULL;
+                cc_ofrw_info_t *rw_info = NULL;
+                rw_key = (cc_ofrw_key_t *)rwht_key;
+                rw_info = (cc_ofrw_info_t *)rwht_info;
+                CC_LOG_DEBUG("extended lookup passed");
+                CC_LOG_INFO("key: rw_sockfd: %d "
+                            "info: layer4_proto: %s "
+                            "info: poll thread name: %s"
+                            "info: devkey controller ip: 0x%x"
+                            "info: devkey switch ip: 0x%x"
+                            "info: devkey l4port: %d",
+                            rw_key->rw_sockfd,
+                            (rw_info->layer4_proto == TCP)? "TCP":"UDP",
+                            rw_info->thr_mgr_p->tname,
+                            rw_info->dev_key.controller_ip_addr,
+                            rw_info->dev_key.switch_ip_addr,
+                            rw_info->dev_key.controller_L4_port);
+                
+            }
+        }
         
         if (g_hash_table_size(cc_htbl) > old_count) {
             *new_entry = TRUE;
@@ -330,21 +372,25 @@ print_ofrw_htbl(void)
     GHashTableIter ofrw_iter;
     cc_ofrw_key_t *rw_key = NULL;
     cc_ofrw_info_t *rw_info = NULL;
+    gpointer rkey = NULL, rinfo = NULL;
     g_hash_table_iter_init(&ofrw_iter, cc_of_global.ofrw_htbl);
     
     CC_LOG_INFO("Printing ofrw Hash Table");
     if (g_hash_table_iter_next(&ofrw_iter,
-                               (gpointer *)&rw_key,
-                               (gpointer *)&rw_info)) {
+                               &rkey, &rinfo)) {
+//                               (gpointer *)&rw_key,
+//                               (gpointer *)&rw_info)) {
+        rw_info = (cc_ofrw_info_t *)rinfo;
+        rw_key = (cc_ofrw_key_t *)rkey;
         if (rw_info->thr_mgr_p == NULL) {
             CC_LOG_ERROR("%s(%d): no polling thread for %d",
                          __FUNCTION__, __LINE__, rw_key->rw_sockfd);
         } else {
             CC_LOG_INFO("key: rw_sockfd: %d "
                         "info: layer4_proto: %s "
-                        "info: poll thread name: %s",
-                        "info: devkey controller ip: 0x%x",
-                        "info: devkey switch ip: 0x%x",
+                        "info: poll thread name: %s"
+                        "info: devkey controller ip: 0x%x"
+                        "info: devkey switch ip: 0x%x"
                         "info: devkey l4port: %d",
                         rw_key->rw_sockfd,
                         (rw_info->layer4_proto == TCP)? "TCP":"UDP",
@@ -543,6 +589,19 @@ cc_of_ret add_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
 //    return(update_global_htbl(OFDEV, ADD, ht_dkey, &ofdev, &new_entry));
 }
 
+gint
+ofrwlist_compare_fd (gconstpointer list_elem, gconstpointer compare_fd)
+{
+    if (*(int *)list_elem < *(int *)compare_fd) {
+        return -1;
+    } else if (*(int *)list_elem > *(int *)compare_fd) {        
+        return 1;
+    } else {
+        return 0;
+    }
+    return 0;
+}
+
 cc_of_ret
 del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
 {
@@ -564,7 +623,8 @@ del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
     }
 
     g_mutex_lock(&ofdev->ofrw_socket_list_lock);
-    tmp_list = g_list_find(ofdev->ofrw_socket_list, &rwsock);
+    tmp_list = g_list_find_custom(ofdev->ofrw_socket_list, &rwsock,
+                                  ofrwlist_compare_fd);
     if (tmp_list == NULL) {
         CC_LOG_ERROR("%s(%d): could not find rwsock %d "
                      "in ofrw_socket_list",
@@ -578,8 +638,8 @@ del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
                                                  tmp_list);
     free(tmp_rwsock);
     g_mutex_unlock(&ofdev->ofrw_socket_list_lock);
-    
-    return(update_global_htbl(OFDEV, ADD, &key, &ofdev, &new_entry));
+//(update_global_htbl(OFDEV, ADD, &key, &ofdev, &new_entry));    
+    return CC_OF_OK;
 }
 
 cc_of_ret
@@ -636,8 +696,8 @@ atomic_add_upd_htbls_with_rwsocket(int sockfd, adpoll_thread_mgr_t  *thr_mgr,
         }
     }
 
-	CC_LOG_DEBUG("%s(%d): Atomically added sockfd to ofrw & ofdev"
-                 "htbls", __FUNCTION__, __LINE__);
+	CC_LOG_DEBUG("%s(%d): Atomically added sockfd %d to ofrw & ofdev"
+                     "htbls", __FUNCTION__, __LINE__, sockfd);
     
     return status;
 }

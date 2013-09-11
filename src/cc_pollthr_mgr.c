@@ -497,7 +497,6 @@ pollthr_pri_pipe_process_func(char *tname,
                        __FUNCTION__, __LINE__, tname,
                        thr_pvt_p->num_pollfds);
           
-          /* setup poll fd for primary pipe*/
           pollfd_entry_p->fd = msg.fd;
           pollfd_entry_p->events = msg.poll_events;
 

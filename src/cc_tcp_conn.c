@@ -1,5 +1,7 @@
 #include "cc_of_global.h"
 #include "cc_of_priv.h"
+#include <unistd.h>
+#include <fcntl.h>
 
 // Number of backlog connection requests
 #define LISTENQ 1024
@@ -53,7 +55,7 @@ void process_listenfd_pollin_func(char *tname UNUSED,
     cc_ofdev_key_t *dev_key;
     cc_ofdev_info_t *dev_info;
     g_hash_table_iter_init(&ofdev_iter, cc_of_global.ofdev_htbl);
-    if (g_hash_table_iter_next(&ofdev_iter, (gpointer *)&dev_key, (gpointer *)&dev_info)) {
+    while (g_hash_table_iter_next(&ofdev_iter, (gpointer *)&dev_key, (gpointer *)&dev_info)) {
         if (dev_info->main_sockfd_tcp == listenfd) {
             // Call NetSVCS Accept
             cc_of_global.NET_SVCS[TCP].accept_conn(listenfd, *dev_key);
@@ -63,7 +65,7 @@ void process_listenfd_pollin_func(char *tname UNUSED,
 }
 
 
-void process_tcpfd_pollin_func(char *tname UNUSED,
+void process_tcpfd_pollin_func(char *tname,
                                adpoll_fd_info_t *data_p,
                                adpoll_send_msg_htbl_info_t *unused_data UNUSED)
 {
@@ -82,17 +84,30 @@ void process_tcpfd_pollin_func(char *tname UNUSED,
         return;
     }
 
+    CC_LOG_DEBUG("%s(%d)[%s]: Someone wants to talk TCP to me at %d!",
+                 __FUNCTION__, __LINE__, tname, tcp_sockfd);
+
     /* Read data from socket */
-    if ((read_len = tcp_read(tcp_sockfd, buf, MAXBUF, 0, NULL, NULL)) < 0) {
-        CC_LOG_ERROR("%s(%d): %s, Error while reading pkt on tcp sockfd: %d",
-                     __FUNCTION__, __LINE__, strerror(errno), tcp_sockfd);
+//    if ((read_len = tcp_read(tcp_sockfd, buf, MAXBUF, 0, NULL, NULL)) < 0) {
+    if (read_len = read(tcp_sockfd, buf, MAXBUF) < 0) {
+        if (errno != EAGAIN) {
+            CC_LOG_ERROR("%s(%d)[%s]: %s, Error while reading pkt on tcp sockfd: %d",
+                         __FUNCTION__, __LINE__, tname,
+                         strerror(errno), tcp_sockfd);
+        } else {
+            CC_LOG_DEBUG("%s(%d)[%s]: EWOULDBLOCK..!", __FUNCTION__,
+                         __LINE__, tname);
+        }
         return;
     }
 
+//    CC_LOG_DEBUG("%s(%d)[%s]: Received a message %s",
+//                 __FUNCTION__, __LINE__, tname, buf);
+
     status = find_ofchann_key_rwsocket(tcp_sockfd, &fd_chann_key);
     if (status < 0) {
-        CC_LOG_ERROR("%s(%d): could not find ofchann key for sockfd %d",
-                     __FUNCTION__, __LINE__, tcp_sockfd);
+        CC_LOG_ERROR("%s(%d)[%s]: could not find ofchann key for sockfd %d",
+                     __FUNCTION__, __LINE__, tname, tcp_sockfd);
         return;
     }
 
@@ -103,54 +118,56 @@ void process_tcpfd_pollin_func(char *tname UNUSED,
     rwkey.rw_sockfd = tcp_sockfd;
     rwinfo = g_hash_table_lookup(cc_of_global.ofrw_htbl, &rwkey);
     if (rwinfo == NULL) {
-        CC_LOG_ERROR("%s(%d): could not find rwsockinfo in ofrw_htbl"
-                     "for sockfd-%d", __FUNCTION__, __LINE__, rwkey.rw_sockfd);
+        CC_LOG_ERROR("%s(%d)[%s]: could not find rwsockinfo in ofrw_htbl"
+                     "for sockfd-%d", __FUNCTION__, __LINE__, tname,
+                     rwkey.rw_sockfd);
         return;
     }
 
     devinfo = g_hash_table_lookup(cc_of_global.ofdev_htbl, &(rwinfo->dev_key));
     if (devinfo == NULL) {
-        CC_LOG_ERROR("%s(%d): could not find devinfo in ofdev_htbl"
-                     "for device", __FUNCTION__, __LINE__);
+        CC_LOG_ERROR("%s(%d)[%s]: could not find devinfo in ofdev_htbl"
+                     "for device", __FUNCTION__, __LINE__,tname);
         return;
     }
 
     /* Send data to controller/switch via their callback */
     devinfo->recv_func(fd_chann_key->dp_id, fd_chann_key->aux_id, 
                         buf, read_len);
-    CC_LOG_INFO("%s(%d): read a pkt on tcp sockfd: %d, aux_id: %lu, dp_id: %u"
-                "and sent it to controller/switch", __FUNCTION__, __LINE__, 
-                tcp_sockfd, fd_chann_key->dp_id, fd_chann_key->aux_id);
+    CC_LOG_INFO("%s(%d)[%s]: read a pkt on tcp sockfd: %d, aux_id: %lu, dp_id: %u"
+                "and sent it to controller/switch", __FUNCTION__, __LINE__,
+                tname, tcp_sockfd, fd_chann_key->dp_id,
+                fd_chann_key->aux_id);
 }
 
 
-void process_tcpfd_pollout_func(char *tname UNUSED,
+void process_tcpfd_pollout_func(char *tname,
                                 adpoll_fd_info_t *data_p,
                                 adpoll_send_msg_htbl_info_t *send_msg_p)
 {
     int tcp_sockfd = 0;
 
     if (data_p == NULL) {
-        CC_LOG_ERROR("%s(%d): received NULL data",
-                     __FUNCTION__, __LINE__);
+        CC_LOG_ERROR("%s(%d)[%s]: received NULL data",
+                     __FUNCTION__, __LINE__, tname);
     }
 
     if (send_msg_p == NULL) {
-        CC_LOG_ERROR("%s(%d): send message invalid",
-                     __FUNCTION__, __LINE__);
+        CC_LOG_ERROR("%s(%d)[%s]: send message invalid",
+                     __FUNCTION__, __LINE__, tname);
     }
 
     tcp_sockfd = data_p->fd;
 
     /* Call tcpsocket send fn */
     if (tcp_write(tcp_sockfd, send_msg_p->data, send_msg_p->data_size, 0, NULL, 0) < 0) {
-        CC_LOG_ERROR("%s(%d): %s, error while sending pkt on tcp sockfd: %d", 
-                     __FUNCTION__, __LINE__, strerror(errno), tcp_sockfd);
+        CC_LOG_ERROR("%s(%d)[%s]: %s, error while sending pkt on tcp sockfd: %d", 
+                     __FUNCTION__, __LINE__, tname, strerror(errno), tcp_sockfd);
         return;
     } 
 
-    CC_LOG_INFO("%s(%d): sent a pkt out on tcp sockfd: %d", __FUNCTION__, 
-                __LINE__, tcp_sockfd);
+    CC_LOG_INFO("%s(%d)[%s]: sent a pkt out on tcp sockfd: %d", __FUNCTION__, 
+                __LINE__, tname, tcp_sockfd);
 
 }
 
@@ -161,6 +178,11 @@ cc_of_ret tcp_open_clientfd(cc_ofdev_key_t key, cc_ofchannel_key_t ofchann_key)
     cc_of_ret status = CC_OF_OK;
     int optval = 1;
     struct sockaddr_in serveraddr, localaddr;
+    struct timeval timeout;      
+    timeout.tv_sec = 10;
+    timeout.tv_usec = 0;
+    int sockflags;
+
 
     if ((clientfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
@@ -174,6 +196,25 @@ cc_of_ret tcp_open_clientfd(cc_ofdev_key_t key, cc_ofchannel_key_t ofchann_key)
                      strerror(errno));
         return status;
     }
+
+    sockflags = fcntl(clientfd,F_GETFL,0);
+    g_assert(sockflags != -1);
+    fcntl(clientfd, F_SETFL, sockflags | O_NONBLOCK);
+
+    #if 0
+    if ((status = setsockopt(clientfd, SOL_SOCKET, SO_RCVTIMEO,
+                              (char *)&timeout, sizeof(timeout))) < 0) {
+        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
+                     strerror(errno));
+    }
+    
+    if ((status = setsockopt(clientfd, SOL_SOCKET, SO_SNDTIMEO,
+                             (char *)&timeout, sizeof(timeout))) < 0) {
+        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
+                     strerror(errno));
+    }
+    #endif
+
     memset(&localaddr, 0, sizeof(localaddr));
     localaddr.sin_family = AF_INET;
     localaddr.sin_addr.s_addr = htonl(key.switch_ip_addr);
@@ -290,12 +331,34 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
     cc_ofdev_key_t dev_key;
     cc_ofdev_info_t *dev_info;
     cc_ofchannel_key_t chann_key;
+    struct timeval timeout;
+    int sockflags;
+    timeout.tv_sec = 10;
+    timeout.tv_usec = 0;
 
     if ((connfd = accept(listenfd, (struct sockaddr *) &clientaddr, 
                          &addrlen)) < 0 ) {
 	    CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
 	    return connfd;
     }
+
+    sockflags = fcntl(connfd,F_GETFL,0);
+    g_assert(sockflags != -1);
+    fcntl(connfd, F_SETFL, sockflags | O_NONBLOCK);
+
+    #if 0
+    if ((status = setsockopt(connfd, SOL_SOCKET, SO_RCVTIMEO,
+                              (char *)&timeout, sizeof(timeout))) < 0) {
+        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
+                     strerror(errno));
+    }
+    
+    if ((status = setsockopt(connfd, SOL_SOCKET, SO_SNDTIMEO,
+                             (char *)&timeout, sizeof(timeout))) < 0) {
+        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
+                     strerror(errno));
+    }
+    #endif
     
     // Add connfd to a thr_mgr and update it in ofrw, ofdev htbls
     thr_msg.fd = connfd;
@@ -335,7 +398,9 @@ ssize_t tcp_read(int sockfd, void *buf, size_t len, int flags,
                  struct sockaddr *src_addr UNUSED, 
                  socklen_t *addrlen UNUSED)
 {
-    return recv(sockfd, buf, len, flags);
+    CC_LOG_DEBUG("%s(%d): Receiving from socket %d", __FUNCTION__, __LINE__, sockfd);
+//    return (recv(sockfd, buf, len, flags));
+    return(read(sockfd, buf, len));
 } 
 
 

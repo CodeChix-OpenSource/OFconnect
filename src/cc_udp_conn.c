@@ -261,6 +261,7 @@ int udp_close(int sockfd)
     
     thr_msg.fd = sockfd;
     thr_msg.fd_type = SOCKET;
+    thr_msg.fd_action = DELETE_FD;
 
     status = find_thrmgr_rwsocket(sockfd, &tmgr);
     if (status < 0) {

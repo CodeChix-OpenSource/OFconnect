@@ -352,8 +352,6 @@ cc_of_dev_free(uint32_t controller_ip_addr,
     ht_dkey = (cc_ofdev_key_t *)ht_dev_key;
     ht_dinfo = (cc_ofdev_info_t *)ht_dev_info;
 
-
-
     // close all ofchannels for this device
     elem = g_list_first(ht_dinfo->ofrw_socket_list);
     if (elem == NULL) {
@@ -375,52 +373,39 @@ cc_of_dev_free(uint32_t controller_ip_addr,
                                          &rwht_key, &rwht_info) == FALSE) {
             CC_LOG_ERROR("%s(%d): ofrw lookup failed", __FUNCTION__,
                          __LINE__);
+        } else {
+            CC_LOG_DEBUG("%s(%d): found %d in ofrw htbl", __FUNCTION__,
+                         __LINE__, rwkey.rw_sockfd);
         }
         
         rwinfo = (cc_ofrw_info_t *)rwht_info;
 
+
+        
         if (rwinfo == NULL) {
             CC_LOG_ERROR("%s(%d): could not find rwsockinfo in ofrw_htbl"
                          "for sockfd-%d", __FUNCTION__, __LINE__, rwkey.rw_sockfd);
             continue;
         } else {
+
             CC_LOG_DEBUG("%s(%d): found rwsock %d with rwinfo: "
                         "info: layer4_proto: %s "
-                        "info: poll thread name: %s",
-                        "info: devkey controller ip: 0x%x",
-                        "info: devkey switch ip: 0x%x",
+                        "info: devkey controller ip: 0x%x "
+                        "info: devkey switch ip: 0x%x "
                         "info: devkey l4port: %d",
                          __FUNCTION__, __LINE__,
                         rwkey.rw_sockfd,
                         (rwinfo->layer4_proto == TCP)? "TCP":"UDP",
-                        rwinfo->thr_mgr_p->tname,
                         rwinfo->dev_key.controller_ip_addr,
                         rwinfo->dev_key.switch_ip_addr,
                         rwinfo->dev_key.controller_L4_port);
+
         }
                          
         elem = elem->next;
 
         status = cc_of_global.NET_SVCS[rwinfo->layer4_proto].close_conn(rwkey.rw_sockfd);
 
-#if 0
-        //used instead of net svcs to test the dev_free
-        status = find_thrmgr_rwsocket(rwkey.rw_sockfd, &tmgr);
-        if (status < 0) {
-            CC_LOG_ERROR("%s(%d): could not find tmgr for tcp sockfd %d",
-                         __FUNCTION__, __LINE__, rwkey.rw_sockfd);
-        }
-        thr_msg.fd = rwkey.rw_sockfd;
-        thr_msg.fd_type = SOCKET;
-        thr_msg.fd_action = DELETE_FD;
-        // Update global htbls
-        status = cc_del_sockfd_rw_pollthr(tmgr, &thr_msg);
-        if (status < 0) {
-            CC_LOG_ERROR("%s(%d): %s, error while deleting tcp sockfd %d "
-                         "from global structures", __FUNCTION__, __LINE__, 
-                         cc_of_strerror(status), thr_msg.fd);
-        }
-#endif
     if (status < 0) {
             CC_LOG_ERROR("%s(%d): %s, Error while closing ofchannel"
                          "sockfd-%d", __FUNCTION__, __LINE__,
@@ -432,10 +417,10 @@ cc_of_dev_free(uint32_t controller_ip_addr,
     // the main_sockfd_udp is part of ofrw_socket_list. It must be cleaned up already.
     thr_msg.fd = ht_dinfo->main_sockfd_tcp;
     thr_msg.fd_type = SOCKET;
-    thr_msg.fd_action = DEL;
+    thr_msg.fd_action = DELETE_FD;
 
     status = adp_thr_mgr_add_del_fd(cc_of_global.oflisten_pollthr_p, &thr_msg);
-    if (status < 0) {
+    if (status != -1 ) {
         CC_LOG_ERROR("%s(%d):Error deleting tcp_listenfd from oflisten_pollthr_p: %s",
                      __FUNCTION__, __LINE__, cc_of_strerror(errno));
     }
@@ -447,10 +432,9 @@ cc_of_dev_free(uint32_t controller_ip_addr,
 
     // delete dev from devhtbl
 
+
     status = update_global_htbl(OFDEV, DEL, ht_dkey, NULL, &new_entry);
 
-
-    
     if (status < 0) {
         CC_LOG_ERROR("%s(%d): %s, Error while freeing dev"
                      "controller_ip-%s, switch_ip-%s,"

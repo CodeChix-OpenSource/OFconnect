@@ -314,7 +314,7 @@ int dummy_recv_func(uint64_t dp_id UNUSED,
 static void
 util_tc_2(test_data_t *tdata, gconstpointer tudata)
 {
-    GRand *random_gen = NULL;
+
     gint32 dummy_fd;
     gint32 testfd_arr[1000]; // to check for uniqueness of generated fds
     gint32 num_fds = 0;
@@ -346,9 +346,6 @@ util_tc_2(test_data_t *tdata, gconstpointer tudata)
 
     /* channel key setup */
     chankey.aux_id = 0;
-
-    /* init random number generator */
-    random_gen = g_rand_new();    
 
    //start a connection and try to connect with listen fd
    //socket(); connect() - use the code in cc_tcp_conn
@@ -422,6 +419,10 @@ util_tc_2(test_data_t *tdata, gconstpointer tudata)
     #endif
     
     #if 0
+    GRand *random_gen = NULL;
+    /* init random number generator */
+    random_gen = g_rand_new();    
+
     
     /* create one unique dummy fd */
     while (!fd_is_unique(testfd_arr, num_fds,
@@ -437,10 +438,19 @@ util_tc_2(test_data_t *tdata, gconstpointer tudata)
     retval = cc_add_sockfd_rw_pollthr(&add_fd_msg, devkey, TCP, chankey);
 
     g_test_message("retval from add_sockfd_rw_pollthr is CC_OF_OK");
-    #endif
-    g_assert(retval == CC_OF_OK);
 
+    g_assert(retval == CC_OF_OK);
     g_rand_free(random_gen);
+    #endif
+
+    CC_LOG_DEBUG("zzzzzzzzzzzzzzzzzzzzzz");
+    /* sleep for sometime to allow the polling thread
+       to process the receive
+    */
+    g_usleep(2000000); //1 million microseconds is 1 sec
+    CC_LOG_DEBUG("zzzzzzzzzzzzzzzzzzzzzz");    
+    
+
 }
 
 //create listen thread in t

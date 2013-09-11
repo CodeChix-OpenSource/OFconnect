@@ -326,7 +326,7 @@ cc_of_dev_free(uint32_t controller_ip_addr,
     g_assert(g_hash_table_contains(cc_of_global.ofdev_htbl,
                                    dkey) == TRUE);
 
-    ("%s(%d): looking up "
+    CC_LOG_DEBUG("%s(%d): looking up "
                  "controller_ip-0x%x, switch_ip-0x%x,"
                  "controller_l4_port-%d",__FUNCTION__, __LINE__,
                  dkey->controller_ip_addr,

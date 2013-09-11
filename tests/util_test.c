@@ -303,6 +303,19 @@ int dummy_recv_func(uint64_t dp_id UNUSED,
     return 1;
 }
 
+int dummy_accept_func(uint64_t dummy_dpid UNUSED,
+                      uint8_t dummy_auxid UNUSED)
+{
+    return 1;
+}
+
+int dummy_del_func(uint64_t dpid UNUSED,
+                   uint8_t auxid UNUSED)
+{
+    return 1;
+}
+
+
 
 // test cc_find_or_create_rw_pollthr
 // cc_del_sockfd_rw_pollthr and cc_add_sockfd_rw_pollthr
@@ -339,7 +352,9 @@ util_tc_2(test_data_t *tdata, gconstpointer tudata)
                                 devkey.switch_ip_addr,
                                 devkey.controller_L4_port,
                                 CC_OFVER_1_3_1,
-                                dummy_recv_func);
+                                dummy_recv_func,
+                                dummy_accept_func,
+                                dummy_del_func);
     g_test_message("retval from dev register is CC_OF_OK");
     g_assert(retval == CC_OF_OK);
 
@@ -532,7 +547,9 @@ util_tc_3(test_data_t *tdata UNUSED, gconstpointer tudata)
                                 devkey.switch_ip_addr,
                                 devkey.controller_L4_port,
                                 CC_OFVER_1_3_1,
-                                receive_packet_process_func);
+                                receive_packet_process_func,
+                                dummy_accept_func,
+                                dummy_del_func);
     g_test_message("retval from dev register is CC_OF_OK");
     g_assert(retval == CC_OF_OK);
 

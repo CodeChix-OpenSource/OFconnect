@@ -430,7 +430,8 @@ add_upd_ofrw_rwsocket(int add_fd, adpoll_thread_mgr_t  *thr_mgr_p,
     ofrw_info->state = CC_OF_RW_DOWN;
     ofrw_info->thr_mgr_p = thr_mgr_p;
     memcpy(&(ofrw_info->dev_key), &key, sizeof(cc_ofdev_key_t));
-    memcpy(&(ofrw_info->client_addr), client_addr, sizeof(struct sockaddr_in));
+    if (client_addr)
+        memcpy(&(ofrw_info->client_addr), client_addr, sizeof(struct sockaddr_in));
     ofrw_info->layer4_proto = layer4_proto;
 
     rc = update_global_htbl(OFRW, ADD,

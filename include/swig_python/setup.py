@@ -1,0 +1,18 @@
+from distutils.core import setup, Extension
+import subprocess
+
+module1 = Extension('_pyccof',
+                include_dirs=['/usr/local/include','/usr/include/glib-2.0', 'usr/include/glib-2.0/glib', '/usr/lib/x86_64-linux-gnu/glib-2.0/include', '/usr/include/python2.7'],
+                library_dirs=['/usr/lib', '/usr/lib/x86_64-linux-gnu', '/usr/local/lib'],
+                runtime_library_dirs=['/usr/lib', '/usr/lib/x86_64-linux-gnu', '/usr/local/lib'],
+                libraries=['glib-2.0', 'python2.7', 'ccof'],
+                sources=['./pyccof.i'])
+
+setup(  name            = 'pyccof',
+        version         = '1.0',
+        author          = 'swiyer:CodeChix',
+        description     = 'SWIG extended Py module - a generic openflow driver',
+        license         = 'copyrighted@CodeChix Bay Area Chapter',
+        url             = '',
+        platforms       = ['x86_64'],
+        ext_modules     = [module1] )

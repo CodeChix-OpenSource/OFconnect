@@ -104,6 +104,7 @@ void process_tcpfd_pollin_func(char *tname,
 //    CC_LOG_DEBUG("%s(%d)[%s]: Received a message %s",
 //                 __FUNCTION__, __LINE__, tname, buf);
 
+    print_ofchann_htbl();
     status = find_ofchann_key_rwsocket(tcp_sockfd, &fd_chann_key);
     if (status < 0) {
         CC_LOG_ERROR("%s(%d)[%s]: could not find ofchann key for sockfd %d",
@@ -131,9 +132,11 @@ void process_tcpfd_pollin_func(char *tname,
         return;
     }
 
+
     /* Send data to controller/switch via their callback */
     devinfo->recv_func(fd_chann_key->dp_id, fd_chann_key->aux_id, 
                         buf, read_len);
+    
     CC_LOG_INFO("%s(%d)[%s]: read a pkt on tcp sockfd: %d, aux_id: %lu, dp_id: %u"
                 "and sent it to controller/switch", __FUNCTION__, __LINE__,
                 tname, tcp_sockfd, fd_chann_key->dp_id,
@@ -268,8 +271,10 @@ cc_of_ret tcp_open_listenfd(cc_ofdev_key_t key)
     struct sockaddr_in serveraddr;
     adpoll_thr_msg_t thr_msg;
 
-    CC_LOG_DEBUG("%s(%d): Starting to open listen fd %d",
-                 __FUNCTION__, __LINE__, key.controller_L4_port);
+    
+    CC_LOG_DEBUG("%s(%d): Starting to open listen fd 0x%x:%d",
+                 __FUNCTION__, __LINE__, key.controller_ip_addr,
+                 key.controller_L4_port);
     
     if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
     	CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));

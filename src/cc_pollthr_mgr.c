@@ -806,7 +806,6 @@ adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p)
                              i, thr_pvt_p->pollfd_arr[i].fd,
                              i, thr_pvt_p->pollfd_arr[i].events);
             }
-            break;
         } else {
             thr_pvt_fd_list = thr_pvt_p->fd_list;
             

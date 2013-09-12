@@ -472,10 +472,18 @@ receive_packet_process_func(uint64_t dp_id, uint8_t aux_id,
     char in_str[100];
     g_test_message("test - %s: message received by receive process CALLBACK API "
                    "is \"%s\"", __FUNCTION__, payload_str);
+
+    if (of_msg_len == 0) {
+        CC_OF_ERROR("%s(%d): zero sized message arrived for dp/aux %lu/%hu",
+                    __FUNCTION__, __LINE__, dp_id, aux_id);
+        return -1;
+    }
     g_memmove(in_str,of_msg,of_msg_len);
+
+    CC_LOG_DEBUG("size of message is %d", of_msg_len);
     in_str[of_msg_len] = 0;
     CC_LOG_DEBUG("%s: WOOOHOOOO message received %s", in_str);
-    return 1;
+    return 0;
 }
 
 /*

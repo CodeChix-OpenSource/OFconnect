@@ -573,9 +573,16 @@ find_ofchann_key_rwsocket(int sockfd, cc_ofchannel_key_t **fd_chann_key) {
      */
 
     g_hash_table_iter_init(&ofchannel_iter, cc_of_global.ofchannel_htbl);
-    while (g_hash_table_iter_next(&ofchannel_iter, (gpointer *)&channel_key, (gpointer *)&channel_info)) {
+    while (g_hash_table_iter_next(&ofchannel_iter,
+                                  (gpointer *)&channel_key,
+                                  (gpointer *)&channel_info)) {
+        CC_LOG_DEBUG("%s(%d): dp/aux %lu/%hu socket %d",
+                     __FUNCTION__, __LINE__, channel_key->dp_id,
+                     channel_key->aux_id, channel_info->rw_sockfd);
+        
         if (channel_info->rw_sockfd == sockfd) {
             channel_key_tmp = channel_key;
+            break;
         }
     }
 

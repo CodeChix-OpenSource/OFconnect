@@ -1,0 +1,23 @@
+/*
+*****************************************************
+**      CodeChix ONF Driver (LibCCOF)
+**      codechix.org - May the code be with you...
+**              Sept. 15, 2013
+*****************************************************
+*/
+
+Each API description
+--------------------
+Device register:
+* Device Register - ip address in host byte order
+
+
+Controller
+----------
+
+
+
+Switch
+------
+
+

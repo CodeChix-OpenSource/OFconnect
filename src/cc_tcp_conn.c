@@ -88,8 +88,7 @@ void process_tcpfd_pollin_func(char *tname,
                  __FUNCTION__, __LINE__, tname, tcp_sockfd);
 
     /* Read data from socket */
-//    if ((read_len = tcp_read(tcp_sockfd, buf, MAXBUF, 0, NULL, NULL)) < 0) {
-    if (read_len = read(tcp_sockfd, buf, MAXBUF) < 0) {
+    if ((read_len = tcp_read(tcp_sockfd, buf, MAXBUF, 0, NULL, NULL)) < 0) {
         if (errno != EAGAIN) {
             CC_LOG_ERROR("%s(%d)[%s]: %s, Error while reading pkt on tcp sockfd: %d",
                          __FUNCTION__, __LINE__, tname,
@@ -404,8 +403,7 @@ ssize_t tcp_read(int sockfd, void *buf, size_t len, int flags,
                  socklen_t *addrlen UNUSED)
 {
     CC_LOG_DEBUG("%s(%d): Receiving from socket %d", __FUNCTION__, __LINE__, sockfd);
-//    return (recv(sockfd, buf, len, flags));
-    return(read(sockfd, buf, len));
+    return (recv(sockfd, buf, len, flags));
 } 
 
 

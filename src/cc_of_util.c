@@ -496,6 +496,8 @@ find_thrmgr_rwsocket(int sockfd,
     cc_ofrw_info_t *rwinfo = NULL;
     
     rwkey.rw_sockfd = sockfd;
+    CC_LOG_DEBUG("%s(%d)", __FUNCTION__, __LINE__);
+    print_ofrw_htbl();
     rwinfo = g_hash_table_lookup(cc_of_global.ofrw_htbl, &rwkey);
     if (rwinfo == NULL) {
         CC_LOG_ERROR("%s(%d): could not find rwsock %d in ofrw_htbl",

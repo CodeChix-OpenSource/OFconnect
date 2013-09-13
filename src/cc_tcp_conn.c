@@ -54,11 +54,20 @@ void process_listenfd_pollin_func(char *tname UNUSED,
     GHashTableIter ofdev_iter;
     cc_ofdev_key_t *dev_key;
     cc_ofdev_info_t *dev_info;
+    cc_ofdev_key_t dkey;
+
+    CC_LOG_DEBUG("%s(%d): %s", __FUNCTION__, __LINE__,
+                    "Inside process_listenfd. going to print ofdev htbl");
+    print_ofdev_htbl();
     g_hash_table_iter_init(&ofdev_iter, cc_of_global.ofdev_htbl);
     while (g_hash_table_iter_next(&ofdev_iter, (gpointer *)&dev_key, (gpointer *)&dev_info)) {
         if (dev_info->main_sockfd_tcp == listenfd) {
             // Call NetSVCS Accept
-            cc_of_global.NET_SVCS[TCP].accept_conn(listenfd, *dev_key);
+            CC_LOG_DEBUG("%s(%d):, Calling netsvcs Accept, dev_key->ControllerIP %d, "
+                            "dev_key->SwitchIp %d", __FUNCTION__, __LINE__, 
+                            dev_key->controller_ip_addr, dev_key->switch_ip_addr);
+            memcpy(&dkey, dev_key, sizeof(cc_ofdev_key_t));
+            cc_of_global.NET_SVCS[TCP].accept_conn(listenfd, dkey);
         }
     }
 
@@ -137,7 +146,7 @@ void process_tcpfd_pollin_func(char *tname,
     devinfo->recv_func(fd_chann_key->dp_id, fd_chann_key->aux_id, 
                         buf, read_len);
     
-    CC_LOG_INFO("%s(%d)[%s]: read a pkt on tcp sockfd: %d, aux_id: %lu, dp_id: %u"
+    CC_LOG_INFO("%s(%d)[%s]: read a pkt on tcp sockfd: %d, dp_id: %lu, aux_id: %u"
                 "and sent it to controller/switch", __FUNCTION__, __LINE__,
                 tname, tcp_sockfd, fd_chann_key->dp_id,
                 fd_chann_key->aux_id);
@@ -333,7 +342,6 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
     struct sockaddr_in clientaddr;
     socklen_t addrlen = sizeof(struct sockaddr_in);
     adpoll_thr_msg_t thr_msg;
-    cc_ofdev_key_t dev_key;
     cc_ofdev_info_t *dev_info;
     cc_ofchannel_key_t chann_key;
     struct timeval timeout;
@@ -373,11 +381,7 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
     thr_msg.pollin_func = &process_tcpfd_pollin_func;
     thr_msg.pollout_func = &process_tcpfd_pollout_func;
     
-    dev_key.controller_ip_addr = key.controller_ip_addr;
-    dev_key.switch_ip_addr = ntohl(clientaddr.sin_addr.s_addr);
-    dev_key.controller_L4_port = key.controller_L4_port; 
-
-    status = cc_add_sockfd_rw_pollthr(&thr_msg, dev_key, TCP, chann_key);
+    status = cc_add_sockfd_rw_pollthr(&thr_msg, key, TCP, chann_key);
     if (status < 0) {
 	    CC_LOG_ERROR("%s(%d):Error updating sockfd in global structures: %s",
                      __FUNCTION__, __LINE__, cc_of_strerror(errno));
@@ -385,7 +389,7 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
 	    return status;
     }
 
-    dev_info = g_hash_table_lookup(cc_of_global.ofdev_htbl, &dev_key);
+    dev_info = g_hash_table_lookup(cc_of_global.ofdev_htbl, &key);
     if (dev_info == NULL) {
         CC_LOG_ERROR("%s(%d): could not find devinfo in ofdev_htbl"
                      "for device", __FUNCTION__, __LINE__);

@@ -280,7 +280,7 @@ int udp_open_clientfd(cc_ofdev_key_t key, cc_ofchannel_key_t ofchann_key)
     thr_msg.pollin_func = &process_udpfd_pollin_func;
     thr_msg.pollout_func = &process_udpfd_pollout_func;
         
-    status = cc_add_sockfd_rw_pollthr(&thr_msg, key, TCP, ofchann_key);
+    status = cc_add_sockfd_rw_pollthr(&thr_msg, key, UDP, ofchann_key);
     if (status < 0) {
 	    CC_LOG_ERROR("%s(%d):Error updating udp sockfd in global structures: %s",
                      __FUNCTION__, __LINE__, cc_of_strerror(errno));
@@ -299,8 +299,8 @@ int udp_open_serverfd(cc_ofdev_key_t key)
     int optval = 1;
     struct sockaddr_in serveraddr;
     adpoll_thr_msg_t thr_msg;
-    adpoll_thread_mgr_t *tmgr = NULL;
     cc_of_ret status = CC_OF_OK;
+    cc_ofchannel_key_t ckey;
 
     if ((serverfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 	    CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(errno));
@@ -331,28 +331,19 @@ int udp_open_serverfd(cc_ofdev_key_t key)
     thr_msg.pollin_func = &process_udpfd_pollin_func;
     thr_msg.pollout_func = &process_udpfd_pollout_func;
 
+    ckey.dp_id = serverfd;
+    ckey.aux_id = serverfd;
+
     /* A single udp serverfd will serve multiple channnels/clients from
      * switches. This will be stored as dev_info->main_sockfd_udp. 
-     * No need to add this fd in global htbls
      */
-
-    /* find or create a poll thread */
-    status = cc_find_or_create_rw_pollthr(&tmgr);
-
-    if(status < 0) {
-        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
-                     cc_of_strerror(status));
-        return status;
-    } else {
-        /* add the udp fd to the thr */
-        CC_LOG_DEBUG("%s(%d): adding fd %d to thread %s",
-                     __FUNCTION__, __LINE__, thr_msg.fd,
-                     tmgr->tname);
-        adp_thr_mgr_add_del_fd(tmgr, &thr_msg);
-        CC_LOG_DEBUG("%s(%d): succesfully added fd %d to thread",
-                     __FUNCTION__, __LINE__, thr_msg.fd);
+    status = cc_add_sockfd_rw_pollthr(&thr_msg, key, UDP, ckey);
+    if (status < 0) {
+	    CC_LOG_ERROR("%s(%d):Error updating udp sockfd in global structures: %s",
+                     __FUNCTION__, __LINE__, cc_of_strerror(errno));
+	    close(serverfd);
+	    return status;
     }
-
     return serverfd;
 }
 

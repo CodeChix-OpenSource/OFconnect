@@ -59,6 +59,12 @@ update_global_htbl(htbl_type_e htbl_type,
 
 void
 print_ofdev_htbl(void);
+void
+print_ofrw_htbl(void);
+void
+print_ofchann_htbl(void);
+
+
 
 cc_of_ret
 del_ofrw_rwsocket(int del_fd);

@@ -616,6 +616,9 @@ cc_of_ret add_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
                                      &key,
                                      &ht_dkey,
                                      &ht_dinfo) == FALSE) {
+        CC_LOG_DEBUG("%s(%d):, ofdev not found, dev_key->ControllerIP %d, "
+                        "dev_key->SwitchIp %d", __FUNCTION__, __LINE__, 
+                         key.controller_ip_addr, key.switch_ip_addr);
         return CC_OF_EINVAL;
     }
     ofdev = (cc_ofdev_info_t *)ht_dinfo;
@@ -696,7 +699,11 @@ atomic_add_upd_htbls_with_rwsocket(int sockfd, struct sockaddr_in *client_addr,
 {
     cc_of_ret status = CC_OF_OK;
 
-
+    CC_LOG_DEBUG("%s(%d) dev controller ip 0x%x, switch ip 0x%x, "
+                 "layer4 port %d", __FUNCTION__, __LINE__,
+                 key.controller_ip_addr, key.switch_ip_addr,
+                 key.controller_L4_port);
+ 
     if((status = add_upd_ofrw_rwsocket(sockfd, thr_mgr, layer4_proto, key, 
                                        client_addr)) < 0) {
         CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(status));
@@ -706,7 +713,7 @@ atomic_add_upd_htbls_with_rwsocket(int sockfd, struct sockaddr_in *client_addr,
     CC_LOG_DEBUG("%s(%d)....++++...",__FUNCTION__, __LINE__);    
     print_ofrw_htbl();
     print_ofdev_htbl();
-    
+     
     if ((status = add_ofdev_rwsocket(key, sockfd)) < 0) {
         CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__,
                      cc_of_strerror(status));
@@ -947,9 +954,12 @@ cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key,
         return status;
     } else {
         print_ofdev_htbl();
-        CC_LOG_DEBUG("%s(%d): succesfully added fd %d to thread",
-                     __FUNCTION__, __LINE__, thr_msg->fd);
         /* add fd to global structures */
+        CC_LOG_DEBUG("%s(%d) dev controller ip 0x%x, switch ip 0x%x, "
+                     "layer4 port %d", __FUNCTION__, __LINE__,
+                     key.controller_ip_addr, key.switch_ip_addr,
+                     key.controller_L4_port);
+ 
         status = atomic_add_upd_htbls_with_rwsocket(thr_msg->fd, NULL,
                                                     tmgr,
                                                     key, 
@@ -965,6 +975,8 @@ cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key,
         CC_LOG_DEBUG("%s(%d): adding fd %d to thread %s",
                      __FUNCTION__, __LINE__, thr_msg->fd,
                      tmgr->tname);
+        CC_LOG_DEBUG("%s(%d): succesfully added fd %d to thread",
+                     __FUNCTION__, __LINE__, thr_msg->fd);
         adp_thr_mgr_add_del_fd(tmgr, thr_msg);
     }
     

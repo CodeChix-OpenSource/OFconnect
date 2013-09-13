@@ -946,13 +946,6 @@ cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key,
                      cc_of_strerror(status));
         return status;
     } else {
-        /* add the fd to the thr */
-        // retval??
-        CC_LOG_DEBUG("%s(%d): adding fd %d to thread %s",
-                     __FUNCTION__, __LINE__, thr_msg->fd,
-                     tmgr->tname);
-        adp_thr_mgr_add_del_fd(tmgr, thr_msg);
-
         print_ofdev_htbl();
         CC_LOG_DEBUG("%s(%d): succesfully added fd %d to thread",
                      __FUNCTION__, __LINE__, thr_msg->fd);
@@ -965,10 +958,14 @@ cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key,
         if (status < 0) {
             CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
                          cc_of_strerror(status));
-            /* Del fd from thr_mgr if update of global structures fails */
-            cc_del_sockfd_rw_pollthr(tmgr, thr_msg); 
             return status;
         }
+        /* add the fd to the thr */
+        // retval??
+        CC_LOG_DEBUG("%s(%d): adding fd %d to thread %s",
+                     __FUNCTION__, __LINE__, thr_msg->fd,
+                     tmgr->tname);
+        adp_thr_mgr_add_del_fd(tmgr, thr_msg);
     }
     
     return status;

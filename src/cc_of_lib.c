@@ -8,6 +8,11 @@ cc_of_global_t cc_of_global;
 extern net_svcs_t tcp_sockfns;
 extern net_svcs_t udp_sockfns;
 
+/* Forward Declarations */
+gboolean
+cc_of_devfree_iter(gpointer key, gpointer value UNUSED,
+                   gpointer user_data UNUSED);
+
 
 inline const char *cc_of_strerror(int errnum)
 {
@@ -39,9 +44,9 @@ cc_of_lib_init(of_dev_type_e dev_type)
     
     cc_of_global.ofdev_type = dev_type;
     cc_of_global.ofdev_htbl = g_hash_table_new_full(cc_ofdev_hash_func,
-                                                    cc_ofdev_htbl_equal_func,
-                                                    cc_of_destroy_generic,
-                                                    cc_ofdev_htbl_destroy_val);
+                                                    cc_ofdev_htbl_equal_func, NULL, NULL);
+                                                    /* cc_of_destroy_generic, */
+                                                    /* cc_ofdev_htbl_destroy_val); */
     if (cc_of_global.ofdev_htbl == NULL) {
 	    status = CC_OF_EHTBL;
 	    cc_of_lib_free();
@@ -122,21 +127,31 @@ cc_of_lib_free()
         cc_ofdev_info_t *dev_info;
 
         g_mutex_lock(&cc_of_global.ofdev_htbl_lock);
-        g_hash_table_iter_init(&ofdev_iter, cc_of_global.ofdev_htbl);
-        while (g_hash_table_iter_next(&ofdev_iter, (gpointer *)&dev_key, 
-                                      (gpointer *)&dev_info)) {
-            status = cc_of_dev_free_lockfree(dev_key->controller_ip_addr, 
-                                             dev_key->switch_ip_addr,
-                                             dev_key->controller_L4_port);
-            if (status < 0) {
-                CC_LOG_ERROR("%s(%d): %s, Error while freeing a dev in ofdev_htbl",
-                             __FUNCTION__, __LINE__, cc_of_strerror(status));
-            }
-        }
+        
+        /* g_hash_table_iter_init(&ofdev_iter, cc_of_global.ofdev_htbl); */
+        /* while (g_hash_table_iter_next(&ofdev_iter, (gpointer *)&dev_key,  */
+        /*                               (gpointer *)&dev_info)) { */
+        /*     status = cc_of_dev_free_lockfree(dev_key->controller_ip_addr,  */
+        /*                                      dev_key->switch_ip_addr, */
+        /*                                      dev_key->controller_L4_port); */
+        /*     if (status < 0) { */
+        /*         CC_LOG_ERROR("%s(%d): %s, Error while freeing a dev in ofdev_htbl", */
+        /*                      __FUNCTION__, __LINE__, cc_of_strerror(status)); */
+        /*     } */
+        /* } */
+
+        g_hash_table_foreach_remove(cc_of_global.ofdev_htbl,
+                                    cc_of_devfree_iter, NULL);
+
+
+        CC_LOG_DEBUG("%s(%d)", __FUNCTION__, __LINE__);
         g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
     }
 
+
     g_mutex_clear(&cc_of_global.ofdev_htbl_lock);
+
+    CC_LOG_DEBUG("%s(%d)", __FUNCTION__, __LINE__);
 
     /* Cleaning up all devices should have cleaned both
      * ofchannel and ofrw htbls as well. But, cleanup again 
@@ -148,12 +163,12 @@ cc_of_lib_free()
     g_hash_table_destroy(cc_of_global.ofchannel_htbl);
     g_hash_table_destroy(cc_of_global.ofrw_htbl);
         
-    g_mutex_clear(&cc_of_global.ofchannel_htbl_lock);
-    g_mutex_clear(&cc_of_global.ofrw_htbl_lock);
-    
     g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);    
     g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
 
+    g_mutex_clear(&cc_of_global.ofchannel_htbl_lock);
+    g_mutex_clear(&cc_of_global.ofrw_htbl_lock);
+    
     if (cc_of_global.oflisten_pollthr_p)
         adp_thr_mgr_free(cc_of_global.oflisten_pollthr_p);
     
@@ -172,6 +187,11 @@ cc_of_lib_free()
     cc_of_log_toggle(FALSE);
     free(cc_of_global.oflog_file);
     g_mutex_clear(&cc_of_global.oflog_lock);
+
+    /* TODO: check if needed - destroying like below causes corruption
+       error on the linked list in ofdev node */
+//    g_hash_table_destroy(cc_of_global.ofdev_htbl);
+    
     return CC_OF_OK;
 }
 
@@ -489,17 +509,33 @@ cc_of_dev_free(uint32_t controller_ip_addr,
     }
 
 
-    CC_LOG_INFO("%s(%d):, Devfree success for device"
-                 "controller_ip-%s, switch_ip-%s,"
-                 "controller_l4_port-%hu",__FUNCTION__, __LINE__,
+    CC_LOG_INFO("%s(%d):, Devfree success for device "
+                 "controller_ip-%s, switch_ip-%s, "
+                 "controller_l4_port-%u",__FUNCTION__, __LINE__,
                  controller_ip, switch_ip, controller_L4_port);
 
     g_free(dkey);
     g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
     g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
     g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
- 
+
     return status;
+}
+
+gboolean
+cc_of_devfree_iter(gpointer key, gpointer value UNUSED,
+                   gpointer user_data UNUSED)
+{
+    cc_of_ret status;
+    status = cc_of_dev_free_lockfree(((cc_ofdev_key_t *)key)->controller_ip_addr,
+                                     ((cc_ofdev_key_t *)key)->switch_ip_addr,
+                                     ((cc_ofdev_key_t *)key)->controller_L4_port);
+    if (status < 0) {
+        CC_LOG_ERROR("%s(%d): %s, Error while freeing a dev in ofdev_htbl",
+                     __FUNCTION__, __LINE__, cc_of_strerror(status));
+        return FALSE;
+    }
+    return TRUE;
 }
 
 
@@ -532,10 +568,7 @@ cc_of_dev_free_lockfree(uint32_t controller_ip_addr,
     g_mutex_lock(&cc_of_global.ofchannel_htbl_lock);
     g_mutex_lock(&cc_of_global.ofrw_htbl_lock);
     
-    g_assert(g_hash_table_size(cc_of_global.ofdev_htbl) == 1);
 //    print_ofdev_htbl();
-    
-
     g_assert(g_hash_table_contains(cc_of_global.ofdev_htbl,
                                    dkey) == TRUE);
 
@@ -653,6 +686,7 @@ cc_of_dev_free_lockfree(uint32_t controller_ip_addr,
                      __FUNCTION__, __LINE__, strerror(errno));
     }
 
+    /*
     // delete dev from devhtbl
     status = update_global_htbl_lockfree(OFDEV, DEL, ht_dkey, NULL, &new_entry);
     if (status < 0) {
@@ -667,18 +701,18 @@ cc_of_dev_free_lockfree(uint32_t controller_ip_addr,
         g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
         return status;
     }
-
+    */
 
     CC_LOG_INFO("%s(%d):, Devfree success for device"
                  "controller_ip-%s, switch_ip-%s,"
                  "controller_l4_port-%hu",__FUNCTION__, __LINE__,
                  controller_ip, switch_ip, controller_L4_port);
 
-    g_free(dkey);
+
+//    g_free(dkey);
     //g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
     g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
     g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
- 
     return status;
 }
 

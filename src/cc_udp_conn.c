@@ -427,10 +427,15 @@ int udp_open_serverfd(cc_ofdev_key_t key)
     serveraddr.sin_port = htons(key.controller_L4_port);
     serveraddr.sin_addr.s_addr = htonl(key.controller_ip_addr);
     
+
     if (bind(serverfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) < 0) {
 	    CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(errno));
 	    return -1;
     }
+    
+    CC_LOG_DEBUG("%s(%d): UDP SERVER SOCKET %d", __FUNCTION__,
+                 __LINE__, serverfd);
+
 
     // Add udpfd to a pollthrmgr
     thr_msg.fd = serverfd;

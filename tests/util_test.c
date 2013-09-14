@@ -12,6 +12,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
 
 #include "cc_of_util.h"
 #include "cc_of_global.h"
@@ -550,6 +551,7 @@ util_tc_3(test_data_t *tdata UNUSED, gconstpointer tudata)
     cc_ofchannel_key_t ofchann_key;
     adpoll_thread_mgr_t *tmgr = NULL;
     int datapipe_fd;
+    int sockflags;
     
     cc_of_debug_toggle(TRUE);    //enable if debugging test code    
     /* device setup */
@@ -592,6 +594,7 @@ util_tc_3(test_data_t *tdata UNUSED, gconstpointer tudata)
         CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
                      strerror(errno));
     }
+
     memset(&localaddr, 0, sizeof(localaddr));
     localaddr.sin_family = AF_INET;
     localaddr.sin_addr.s_addr = htonl(devkey.switch_ip_addr);
@@ -613,7 +616,11 @@ util_tc_3(test_data_t *tdata UNUSED, gconstpointer tudata)
                                  sizeof(serveraddr))) < 0) {
         CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, strerror(errno));
     }
-    
+
+    sockflags = fcntl(clientfd,F_GETFL,0);
+    g_assert(sockflags != -1);
+    fcntl(clientfd, F_SETFL, sockflags | O_NONBLOCK);
+
     // Add clientfd to a thr_mgr and update it in ofrw, ofdev htbls
     // we don't need to do this step if we use create_channel api
     adpoll_thr_msg_t thr_msg;
@@ -651,7 +658,7 @@ util_tc_3(test_data_t *tdata UNUSED, gconstpointer tudata)
     g_memmove(((adpoll_send_msg_t *)send_buf)->data,
               payload_str, strlen(payload_str) + 1);
 
-    find_thrmgr_rwsocket(clientfd, &tmgr);
+    find_thrmgr_rwsocket_lockfree(clientfd, &tmgr);
 
     g_assert_cmpstr(tmgr->tname, ==, "rwthr_1");
 
@@ -673,7 +680,8 @@ util_tc_3(test_data_t *tdata UNUSED, gconstpointer tudata)
                  __FUNCTION__);
     
     /* snooze */
-    g_usleep(20000000);
+//    g_usleep(300000000);f
+    g_usleep(2000000);    
     CC_LOG_DEBUG("%s - ALL DONE", __FUNCTION__);
 }
 
@@ -1288,15 +1296,15 @@ int main(int argc, char **argv)
 {
     g_test_init(&argc, &argv, NULL);
 
-    g_test_add("/util/tc_1",
-               test_data_t,
-               "rwthr_1",
-               util_start, util_tc_1, util_end);
+    /* g_test_add("/util/tc_1", */
+    /*            test_data_t, */
+    /*            "rwthr_1", */
+    /*            util_start, util_tc_1, util_end); */
 
-    g_test_add("/util/tc_2",
-               test_data_t,
-              "rwthr_1",
-               util_start, util_tc_2, util_end);
+    /* g_test_add("/util/tc_2", */
+    /*            test_data_t, */
+    /*           "rwthr_1", */
+    /*            util_start, util_tc_2, util_end); */
 
 
     g_test_add("/util/tc_3",

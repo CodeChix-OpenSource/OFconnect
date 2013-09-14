@@ -145,7 +145,7 @@ update_global_htbl(htbl_type_e htbl_type,
             info_data = malloc(sizeof(cc_ofdev_info_t));
             memcpy(info_data, htbl_data, sizeof(cc_ofdev_info_t));
         }
-            print_ofdev_htbl();
+//            print_ofdev_htbl();
         break;
       case OFRW:
         cc_htbl = cc_of_global.ofrw_htbl;
@@ -219,7 +219,7 @@ update_global_htbl(htbl_type_e htbl_type,
         g_hash_table_insert(cc_htbl, htbl_key, htbl_data);
 
         if (htbl_type == OFDEV) {
-            print_ofdev_htbl();
+//            print_ofdev_htbl();
         } else if (htbl_type == OFRW) {
             gpointer rwht_key = NULL, rwht_info = NULL;
             if (g_hash_table_contains(cc_htbl, htbl_key)) {
@@ -295,7 +295,7 @@ update_global_htbl(htbl_type_e htbl_type,
         g_hash_table_insert(cc_htbl, key, info_data);
 
         if (htbl_type == OFDEV) {        
-            print_ofdev_htbl();
+//            print_ofdev_htbl();
         } else if (htbl_type == OFCHANN) {
             print_ofchann_htbl();
         } else if (htbl_type == OFRW) {
@@ -377,7 +377,7 @@ update_global_htbl_lockfree(htbl_type_e htbl_type,
             info_data = malloc(sizeof(cc_ofdev_info_t));
             memcpy(info_data, htbl_data, sizeof(cc_ofdev_info_t));
         }
-            print_ofdev_htbl();
+//            print_ofdev_htbl();
         break;
       case OFRW:
         cc_htbl = cc_of_global.ofrw_htbl;
@@ -451,7 +451,7 @@ update_global_htbl_lockfree(htbl_type_e htbl_type,
         g_hash_table_insert(cc_htbl, htbl_key, htbl_data);
 
         if (htbl_type == OFDEV) {
-            print_ofdev_htbl();
+//            print_ofdev_htbl();
         } else if (htbl_type == OFRW) {
             gpointer rwht_key = NULL, rwht_info = NULL;
             if (g_hash_table_contains(cc_htbl, htbl_key)) {
@@ -462,7 +462,7 @@ update_global_htbl_lockfree(htbl_type_e htbl_type,
             CC_LOG_DEBUG("OFRW htbl size after insert of %d: %d",
                          ((cc_ofrw_key_t *)htbl_key)->rw_sockfd,
                          g_hash_table_size(cc_htbl));
-            print_ofrw_htbl();
+//            print_ofrw_htbl();
 
             if (g_hash_table_lookup_extended(cc_of_global.ofrw_htbl,
                                              htbl_key,
@@ -493,7 +493,7 @@ update_global_htbl_lockfree(htbl_type_e htbl_type,
                          __FUNCTION__, __LINE__,
                          ((cc_ofrw_key_t *)htbl_key)->rw_sockfd);
         } else {
-            print_ofchann_htbl();
+//            print_ofchann_htbl();
         }
         
         if (g_hash_table_size(cc_htbl) > old_count) {
@@ -527,9 +527,9 @@ update_global_htbl_lockfree(htbl_type_e htbl_type,
         g_hash_table_insert(cc_htbl, key, info_data);
 
         if (htbl_type == OFDEV) {        
-            print_ofdev_htbl();
+//            print_ofdev_htbl();
         } else if (htbl_type == OFCHANN) {
-            print_ofchann_htbl();
+//            print_ofchann_htbl();
         } else if (htbl_type == OFRW) {
             gpointer rwht_key = NULL, rwht_info = NULL;
             if (g_hash_table_contains(cc_htbl, htbl_key)) {
@@ -541,7 +541,7 @@ update_global_htbl_lockfree(htbl_type_e htbl_type,
                          ((cc_ofrw_key_t *)htbl_key)->rw_sockfd,
                          g_hash_table_size(cc_htbl));
             
-            print_ofrw_htbl();
+//            print_ofrw_htbl();
             
             if (g_hash_table_lookup_extended(cc_of_global.ofrw_htbl,
                                              htbl_key,
@@ -888,7 +888,7 @@ cc_of_ret add_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
                  key.controller_ip_addr, key.switch_ip_addr,
                  key.controller_L4_port);
     
-    print_ofdev_htbl();
+//    print_ofdev_htbl();
     
     if (g_hash_table_lookup_extended(cc_of_global.ofdev_htbl,
                                      &key,
@@ -911,7 +911,7 @@ cc_of_ret add_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
 
 //    retval = (update_global_htbl(OFDEV, ADD, ht_dkey, &ofdev, &new_entry));
     CC_LOG_DEBUG("%s(%d): updated ofdev add ", __FUNCTION__, __LINE__);
-    print_ofdev_htbl();
+//    print_ofdev_htbl();
 //    return(update_global_htbl(OFDEV, ADD, ht_dkey, &ofdev, &new_entry));
 }
 
@@ -988,7 +988,7 @@ atomic_add_upd_htbls_with_rwsocket(int sockfd, struct sockaddr_in *client_addr,
 
     CC_LOG_DEBUG("%s(%d)....++++...",__FUNCTION__, __LINE__);    
     print_ofrw_htbl();
-    print_ofdev_htbl();
+//    print_ofdev_htbl();
      
     if ((status = add_ofdev_rwsocket(key, sockfd)) < 0) {
         CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__,
@@ -998,7 +998,7 @@ atomic_add_upd_htbls_with_rwsocket(int sockfd, struct sockaddr_in *client_addr,
     }
     CC_LOG_DEBUG("%s(%d): successfully updated ofdevice", __FUNCTION__,
                  __LINE__);
-    print_ofdev_htbl();
+//    print_ofdev_htbl();
     /* update ofchannel htbl */
 
     /* If controller, use sockfd as dummy dp_id/aux_id until we recv 
@@ -1247,7 +1247,7 @@ cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key,
                      cc_of_strerror(status));
         return status;
     } else {
-        print_ofdev_htbl();
+//        print_ofdev_htbl();
         /* add fd to global structures */
 
         g_mutex_lock(&cc_of_global.ofdev_htbl_lock);

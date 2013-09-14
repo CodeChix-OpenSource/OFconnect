@@ -133,8 +133,8 @@ void process_tcpfd_pollin_func(char *tname,
         return;
     }
 
-//    CC_LOG_DEBUG("%s(%d)[%s]: Received a message %s",
-//                 __FUNCTION__, __LINE__, tname, buf);
+    CC_LOG_DEBUG("%s(%d)[%s]: Received a message %s",
+                 __FUNCTION__, __LINE__, tname, buf);
     g_mutex_lock(&cc_of_global.ofdev_htbl_lock);
     g_mutex_lock(&cc_of_global.ofchannel_htbl_lock);
     g_mutex_lock(&cc_of_global.ofrw_htbl_lock);
@@ -479,7 +479,7 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
     }
     memcpy(&rw_info_new, rw_info, sizeof(cc_ofrw_info_t));
     rw_info_new.state = CC_OF_RW_UP;
-    update_global_htbl(OFRW, ADD, (gpointer)&rw_key, (gpointer)&rw_info_new, 
+    update_global_htbl_lockfree(OFRW, ADD, (gpointer)&rw_key, (gpointer)&rw_info_new, 
                        &new_entry);
     CC_LOG_DEBUG("%s(%d): Updated TCP channel State to CC_OF_RW_UP",
                 __FUNCTION__, __LINE__);
@@ -496,8 +496,13 @@ ssize_t tcp_read(int sockfd, void *buf, size_t len, int flags,
                  struct sockaddr *src_addr UNUSED, 
                  socklen_t *addrlen UNUSED)
 {
+    ssize_t ret_len;
     CC_LOG_DEBUG("%s(%d): Receiving from socket %d", __FUNCTION__, __LINE__, sockfd);
-    return (recv(sockfd, buf, len, flags));
+    ret_len = recv(sockfd, buf, len, flags);
+//    ret_len = read(sockfd, buf, len);
+    CC_LOG_DEBUG("%s(%d): Received %d bytes from socket %d", __FUNCTION__, __LINE__, ret_len, sockfd);
+    
+    return ret_len;
 } 
 
 

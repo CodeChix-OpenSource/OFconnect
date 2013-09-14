@@ -354,7 +354,7 @@ cc_of_dev_free(uint32_t controller_ip_addr,
     g_mutex_lock(&cc_of_global.ofrw_htbl_lock);
  
     g_assert(g_hash_table_size(cc_of_global.ofdev_htbl) == 1);
-    print_ofdev_htbl();
+//    print_ofdev_htbl();
 
     g_assert(g_hash_table_contains(cc_of_global.ofdev_htbl,
                                    dkey) == TRUE);
@@ -366,7 +366,7 @@ cc_of_dev_free(uint32_t controller_ip_addr,
                  dkey->switch_ip_addr,
                  dkey->controller_L4_port);
 
-    print_ofdev_htbl();    
+//    print_ofdev_htbl();    
     if (g_hash_table_lookup_extended(cc_of_global.ofdev_htbl,
                                      dkey,
                                      &ht_dev_key,
@@ -533,7 +533,7 @@ cc_of_dev_free_lockfree(uint32_t controller_ip_addr,
     g_mutex_lock(&cc_of_global.ofrw_htbl_lock);
     
     g_assert(g_hash_table_size(cc_of_global.ofdev_htbl) == 1);
-    print_ofdev_htbl();
+//    print_ofdev_htbl();
     
 
     g_assert(g_hash_table_contains(cc_of_global.ofdev_htbl,
@@ -546,7 +546,7 @@ cc_of_dev_free_lockfree(uint32_t controller_ip_addr,
                  dkey->switch_ip_addr,
                  dkey->controller_L4_port);
 
-    print_ofdev_htbl();    
+//    print_ofdev_htbl();    
     if (g_hash_table_lookup_extended(cc_of_global.ofdev_htbl,
                                      dkey,
                                      &ht_dev_key,

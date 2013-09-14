@@ -37,7 +37,8 @@ void process_listenfd_pollin_func(char *tname UNUSED,
                                   adpoll_send_msg_htbl_info_t *unused_data UNUSED)
 {
     int listenfd;    
-
+    gboolean found = FALSE;
+    
     if (!data_p) {
         CC_LOG_INFO("%s(%d): %s", __FUNCTION__, __LINE__,
                     "Invalid data passed to listenfd callback."
@@ -54,13 +55,25 @@ void process_listenfd_pollin_func(char *tname UNUSED,
     GHashTableIter ofdev_iter;
     cc_ofdev_key_t *dev_key;
     cc_ofdev_info_t *dev_info;
+
+    g_mutex_lock(&cc_of_global.ofdev_htbl_lock);
+    
     g_hash_table_iter_init(&ofdev_iter, cc_of_global.ofdev_htbl);
     while (g_hash_table_iter_next(&ofdev_iter, (gpointer *)&dev_key, (gpointer *)&dev_info)) {
         if (dev_info->main_sockfd_tcp == listenfd) {
             // Call NetSVCS Accept
+            /* Unlock ofdev_htbl here as accept locks it again.
+             * TODO: check if we could avoid this
+             */
+            found = TRUE;
+            g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
+            
             cc_of_global.NET_SVCS[TCP].accept_conn(listenfd, *dev_key);
         }
     }
+    if (!found)
+        g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
+   
 
 }
 
@@ -102,12 +115,19 @@ void process_tcpfd_pollin_func(char *tname,
 
 //    CC_LOG_DEBUG("%s(%d)[%s]: Received a message %s",
 //                 __FUNCTION__, __LINE__, tname, buf);
+    g_mutex_lock(&cc_of_global.ofdev_htbl_lock);
+    g_mutex_lock(&cc_of_global.ofchannel_htbl_lock);
+    g_mutex_lock(&cc_of_global.ofrw_htbl_lock);
 
     print_ofchann_htbl();
     status = find_ofchann_key_rwsocket(tcp_sockfd, &fd_chann_key);
     if (status < 0) {
         CC_LOG_ERROR("%s(%d)[%s]: could not find ofchann key for sockfd %d",
+
                      __FUNCTION__, __LINE__, tname, tcp_sockfd);
+        g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+        g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+        g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
         return;
     }
 
@@ -121,6 +141,10 @@ void process_tcpfd_pollin_func(char *tname,
         CC_LOG_ERROR("%s(%d)[%s]: could not find rwsockinfo in ofrw_htbl"
                      "for sockfd-%d", __FUNCTION__, __LINE__, tname,
                      rwkey.rw_sockfd);
+        g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+        g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+        g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
+        
         return;
     }
 
@@ -128,6 +152,9 @@ void process_tcpfd_pollin_func(char *tname,
     if (devinfo == NULL) {
         CC_LOG_ERROR("%s(%d)[%s]: could not find devinfo in ofdev_htbl"
                      "for device", __FUNCTION__, __LINE__,tname);
+        g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+        g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+        g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
         return;
     }
 
@@ -140,6 +167,11 @@ void process_tcpfd_pollin_func(char *tname,
                 "and sent it to controller/switch", __FUNCTION__, __LINE__,
                 tname, tcp_sockfd, fd_chann_key->dp_id,
                 fd_chann_key->aux_id);
+
+    g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+    g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+    g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
+    
 }
 
 
@@ -384,16 +416,19 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
 	    return status;
     }
 
+    g_mutex_lock(&cc_of_global.ofdev_htbl_lock);    
     dev_info = g_hash_table_lookup(cc_of_global.ofdev_htbl, &dev_key);
     if (dev_info == NULL) {
         CC_LOG_ERROR("%s(%d): could not find devinfo in ofdev_htbl"
                      "for device", __FUNCTION__, __LINE__);
+        g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
+        close(connfd);
         return CC_OF_EHTBL;
     }
 
     /* Notify the controller about the new TCP channel */
     dev_info->accept_chann_func((uint64_t)connfd, (uint8_t)connfd);
-
+    g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
     return connfd;
 }
 
@@ -415,6 +450,7 @@ ssize_t tcp_write(int sockfd, const void *buf, size_t len, int flags,
 }
 
 
+// caller should acquire three htbl locks
 cc_of_ret tcp_close(int sockfd)
 {
     cc_of_ret status = CC_OF_OK;
@@ -427,7 +463,22 @@ cc_of_ret tcp_close(int sockfd)
 
     CC_LOG_DEBUG("%s(%d): Starting", __FUNCTION__, __LINE__);
 
-    status = find_thrmgr_rwsocket(sockfd, &tmgr);
+#if 0
+    status = find_ofchann_key_rwsocket(tcp_sockfd, &fd_chann_key);
+    if (status < 0) {
+        CC_LOG_ERROR("%s(%d): could not find ofchann key for sockfd %d",
+                     __FUNCTION__, __LINE__, tcp_sockfd);
+        return;
+    }
+    
+    if (fd_chann_key->aux_id == 0) {
+         /* If this is a main channel close all its auxiliary channels also */
+        tcp_close();
+    }
+#endif
+
+    status = find_thrmgr_rwsocket_lockfree(sockfd, &tmgr);
+    
     if (status < 0) {
         CC_LOG_ERROR("%s(%d): could not find tmgr for tcp sockfd %d",
                      __FUNCTION__, __LINE__, sockfd);

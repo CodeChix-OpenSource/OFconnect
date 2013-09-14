@@ -69,12 +69,9 @@ void cc_ofdev_htbl_destroy_val(gpointer data)
 {
     cc_ofdev_info_t *dev_info_p;
     dev_info_p = (cc_ofdev_info_t *)data;
-    g_mutex_lock(&dev_info_p->ofrw_socket_list_lock);
+
     g_list_free_full(dev_info_p->ofrw_socket_list,
                      cc_of_destroy_generic);
-    g_mutex_unlock(&dev_info_p->ofrw_socket_list_lock);
-    
-    g_mutex_clear(&dev_info_p->ofrw_socket_list_lock);
     
     g_free(data);
 }
@@ -118,7 +115,7 @@ gboolean cc_ofrw_htbl_equal_func(gconstpointer a, gconstpointer b)
     }
 }
 
-    
+// TODO: UNUSED FUNCTION Remove before submission    
 cc_of_ret
 update_global_htbl(htbl_type_e htbl_type,
                    htbl_update_ops_e htbl_op,
@@ -351,6 +348,239 @@ update_global_htbl(htbl_type_e htbl_type,
     return CC_OF_OK;
 }
 
+// Caller will acquire htbl locks
+cc_of_ret
+update_global_htbl_lockfree(htbl_type_e htbl_type,
+                            htbl_update_ops_e htbl_op,
+                            gpointer htbl_key,
+                            gpointer htbl_data,
+                            gboolean *new_entry)
+{
+    GHashTable *cc_htbl;
+    //GMutex *cc_htbl_lock;
+    gpointer key, info_data;
+
+    *new_entry = FALSE;
+    guint old_count;
+
+   switch(htbl_type) {
+     case OFDEV:
+        cc_htbl = cc_of_global.ofdev_htbl;
+        //cc_htbl_lock = &cc_of_global.ofdev_htbl_lock;
+        //g_mutex_lock(cc_htbl_lock);        
+        if ((htbl_op == ADD) &&
+            (g_hash_table_contains(cc_htbl, htbl_key))) {
+            htbl_op = UPD;
+            /* create a new key. the insert operation will free this */
+            key = malloc(sizeof(cc_ofdev_key_t));
+            memcpy(key, htbl_key, sizeof(cc_ofdev_key_t));
+            info_data = malloc(sizeof(cc_ofdev_info_t));
+            memcpy(info_data, htbl_data, sizeof(cc_ofdev_info_t));
+        }
+            print_ofdev_htbl();
+        break;
+      case OFRW:
+        cc_htbl = cc_of_global.ofrw_htbl;
+        //cc_htbl_lock = &cc_of_global.ofrw_htbl_lock;
+        //g_mutex_lock(cc_htbl_lock);
+        if ((htbl_op == ADD) &&
+            (g_hash_table_contains(cc_htbl, htbl_key))) {
+            htbl_op = UPD;
+            /* create a new key. the insert operation will free ths */
+            key = malloc(sizeof(cc_ofrw_key_t));
+            memcpy(key, htbl_key, sizeof(cc_ofrw_key_t));
+            info_data = malloc(sizeof(cc_ofrw_info_t));
+            memcpy(info_data, htbl_data, sizeof(cc_ofrw_info_t));
+        }
+        break;
+      case OFCHANN:
+        cc_htbl = cc_of_global.ofchannel_htbl;
+        //cc_htbl_lock = &cc_of_global.ofchannel_htbl_lock;
+        //g_mutex_lock(cc_htbl_lock);
+        if ((htbl_op == ADD) &&
+            (g_hash_table_contains(cc_htbl, htbl_key))) {
+            /* create a new key. the insert operation will free this */
+            key = malloc(sizeof(cc_ofchannel_key_t));
+            memcpy(key, htbl_key, sizeof(cc_ofchannel_key_t));
+            info_data = malloc(sizeof(cc_ofchannel_info_t));
+            memcpy(info_data, htbl_data, sizeof(cc_ofchannel_info_t));
+        }
+        break;
+      default:
+        CC_LOG_ERROR("%s(%d): invalid htbl type %d",
+                     __FUNCTION__, __LINE__, htbl_type);
+    }
+
+    if (htbl_op == ADD) {
+
+        old_count = g_hash_table_size(cc_htbl);
+        CC_LOG_DEBUG("%s(%d): insert operation for htbl_type %s",
+                     __FUNCTION__, __LINE__,
+                     (htbl_type == OFDEV)? "OFDEV":
+                     ((htbl_type == OFRW)?"OFRW":"OFCHANN"));
+        if (htbl_type == OFDEV) {
+            CC_LOG_DEBUG("%s(%d) key has controller ip 0x%x, switch ip 0x%x and port %d",
+                         __FUNCTION__, __LINE__,
+                         ((cc_ofdev_key_t *)htbl_key)->controller_ip_addr,
+                         ((cc_ofdev_key_t *)htbl_key)->switch_ip_addr,
+                         ((cc_ofdev_key_t *)htbl_key)->controller_L4_port);
+        } else if (htbl_type == OFRW) {
+            CC_LOG_DEBUG("%s(%d) insert key has socket %d",
+                         __FUNCTION__, __LINE__,
+                         ((cc_ofrw_key_t *)htbl_key)->rw_sockfd);
+
+            CC_LOG_DEBUG("%s(%d) insert info has l4 proto %s",
+                         __FUNCTION__, __LINE__,
+                         (((cc_ofrw_info_t *)htbl_data)->layer4_proto == TCP)?
+                         "TCP":((((cc_ofrw_info_t *)htbl_data)->layer4_proto
+                                 == UDP)? "UDP":"INVALID"));
+
+            if (g_hash_table_contains(cc_htbl, htbl_key)) {
+                CC_LOG_DEBUG("(%s(%d): OFRW htbl already contains %d",
+                             __FUNCTION__, __LINE__,
+                             ((cc_ofrw_key_t *)htbl_key)->rw_sockfd);
+            }
+        } else if (htbl_type == OFCHANN) {
+            CC_LOG_DEBUG("%s(%d) ofchannel key dp/aux %lu/%hu",
+                         __FUNCTION__, __LINE__,
+                         ((cc_ofchannel_key_t *)htbl_key)->dp_id,
+                         ((cc_ofchannel_key_t *)htbl_key)->aux_id);
+        }
+
+
+        g_hash_table_insert(cc_htbl, htbl_key, htbl_data);
+
+        if (htbl_type == OFDEV) {
+            print_ofdev_htbl();
+        } else if (htbl_type == OFRW) {
+            gpointer rwht_key = NULL, rwht_info = NULL;
+            if (g_hash_table_contains(cc_htbl, htbl_key)) {
+                CC_LOG_DEBUG("(%s(%d): OFRW htbl contains %d",
+                             __FUNCTION__, __LINE__,
+                             ((cc_ofrw_key_t *)htbl_key)->rw_sockfd);
+            }
+            CC_LOG_DEBUG("OFRW htbl size after insert of %d: %d",
+                         ((cc_ofrw_key_t *)htbl_key)->rw_sockfd,
+                         g_hash_table_size(cc_htbl));
+            print_ofrw_htbl();
+
+            if (g_hash_table_lookup_extended(cc_of_global.ofrw_htbl,
+                                             htbl_key,
+                                             &rwht_key, &rwht_info)
+                == FALSE) {
+                CC_LOG_DEBUG("extended lookup failed");
+            } else {
+                cc_ofrw_key_t *rw_key =  NULL;
+                cc_ofrw_info_t *rw_info = NULL;
+                rw_key = (cc_ofrw_key_t *)rwht_key;
+                rw_info = (cc_ofrw_info_t *)rwht_info;
+                CC_LOG_DEBUG("extended lookup passed");
+                CC_LOG_INFO("key: rw_sockfd: %d "
+                            "info: layer4_proto: %s "
+                            "info: poll thread name: %s"
+                            "info: devkey controller ip: 0x%x"
+                            "info: devkey switch ip: 0x%x"
+                            "info: devkey l4port: %d",
+                            rw_key->rw_sockfd,
+                            (rw_info->layer4_proto == TCP)? "TCP":"UDP",
+                            rw_info->thr_mgr_p->tname,
+                            rw_info->dev_key.controller_ip_addr,
+                            rw_info->dev_key.switch_ip_addr,
+                            rw_info->dev_key.controller_L4_port);
+                
+            }
+            CC_LOG_DEBUG("%s(%d) key has socket %d",
+                         __FUNCTION__, __LINE__,
+                         ((cc_ofrw_key_t *)htbl_key)->rw_sockfd);
+        } else {
+            print_ofchann_htbl();
+        }
+        
+        if (g_hash_table_size(cc_htbl) > old_count) {
+            *new_entry = TRUE;
+        }
+        
+    } else if (htbl_op == DEL) {
+        CC_LOG_DEBUG("%s(%d).. HTBL DEL ", __FUNCTION__, __LINE__);
+        if (g_hash_table_contains(cc_htbl, htbl_key)) {
+            CC_LOG_DEBUG("%s(%d) DEL operation found entry",
+                         __FUNCTION__, __LINE__);
+        }
+        if (g_hash_table_remove(cc_htbl, htbl_key) == FALSE) {
+            CC_LOG_DEBUG("%s(%d) DEL unsuccessful",
+                         __FUNCTION__, __LINE__);
+            
+            //g_mutex_unlock(cc_htbl_lock);            
+            return CC_OF_EHTBL;
+        }
+
+    } else if (htbl_op == UPD) {
+        old_count = g_hash_table_size(cc_htbl);
+        CC_LOG_DEBUG("%s(%d): replace existing entry operation", __FUNCTION__, __LINE__);
+        if (htbl_type == OFDEV) {
+            CC_LOG_DEBUG("%s(%d) key has controller ip 0x%x, switch ip 0x%x and port %d",
+                         __FUNCTION__, __LINE__,
+                         ((cc_ofdev_key_t *)key)->controller_ip_addr,
+                         ((cc_ofdev_key_t *)key)->switch_ip_addr,
+                         ((cc_ofdev_key_t *)key)->controller_L4_port);
+        }
+        g_hash_table_insert(cc_htbl, key, info_data);
+
+        if (htbl_type == OFDEV) {        
+            print_ofdev_htbl();
+        } else if (htbl_type == OFCHANN) {
+            print_ofchann_htbl();
+        } else if (htbl_type == OFRW) {
+            gpointer rwht_key = NULL, rwht_info = NULL;
+            if (g_hash_table_contains(cc_htbl, htbl_key)) {
+                CC_LOG_DEBUG("(%s(%d): OFRW htbl contains %d",
+                             __FUNCTION__, __LINE__,
+                             ((cc_ofrw_key_t *)htbl_key)->rw_sockfd);
+            }
+            CC_LOG_DEBUG("OFRW htbl size after insert of %d: %d",
+                         ((cc_ofrw_key_t *)htbl_key)->rw_sockfd,
+                         g_hash_table_size(cc_htbl));
+            
+            print_ofrw_htbl();
+            
+            if (g_hash_table_lookup_extended(cc_of_global.ofrw_htbl,
+                                             htbl_key,
+                                             &rwht_key, &rwht_info)
+                == FALSE) {
+                CC_LOG_DEBUG("extended lookup failed");
+            } else {
+                cc_ofrw_key_t *rw_key =  NULL;
+                cc_ofrw_info_t *rw_info = NULL;
+                rw_key = (cc_ofrw_key_t *)rwht_key;
+                rw_info = (cc_ofrw_info_t *)rwht_info;
+                CC_LOG_DEBUG("extended lookup passed");
+                CC_LOG_INFO("key: rw_sockfd: %d "
+                            "info: layer4_proto: %s "
+                            "info: poll thread name: %s"
+                            "info: devkey controller ip: 0x%x"
+                            "info: devkey switch ip: 0x%x"
+                            "info: devkey l4port: %d",
+                            rw_key->rw_sockfd,
+                            (rw_info->layer4_proto == TCP)? "TCP":"UDP",
+                            rw_info->thr_mgr_p->tname,
+                            rw_info->dev_key.controller_ip_addr,
+                            rw_info->dev_key.switch_ip_addr,
+                            rw_info->dev_key.controller_L4_port);
+                
+            }
+        }
+        
+        if (g_hash_table_size(cc_htbl) > old_count) {
+            *new_entry = TRUE;
+        }
+
+    }
+    
+    //g_mutex_unlock(cc_htbl_lock);
+    return CC_OF_OK;
+}
+
+
 void
 print_ofdev_htbl(void)
 {
@@ -424,7 +654,6 @@ print_ofchann_htbl(void)
     cc_ofchannel_key_t *ch_key = NULL;
     cc_ofchannel_info_t *ch_info = NULL;
     g_hash_table_iter_init(&ofch_iter, cc_of_global.ofchannel_htbl);
-    GList *list_elem = NULL;
 
     CC_LOG_INFO("Printing ofchannel Hash Table");
     while (g_hash_table_iter_next(&ofch_iter,
@@ -446,10 +675,11 @@ del_ofrw_rwsocket(int del_fd)
     ofrw_key.rw_sockfd = del_fd;
     gboolean new_entry;
 
-    return (update_global_htbl(OFRW, DEL, (gpointer)&ofrw_key,
-                               NULL, &new_entry));
+    return (update_global_htbl_lockfree(OFRW, DEL, (gpointer)&ofrw_key,
+                                        NULL, &new_entry));
 }
 
+//caller will acqure ofrw_htbl lock
 cc_of_ret
 add_upd_ofrw_rwsocket(int add_fd, adpoll_thread_mgr_t  *thr_mgr_p,
                       L4_type_e layer4_proto,
@@ -471,10 +701,10 @@ add_upd_ofrw_rwsocket(int add_fd, adpoll_thread_mgr_t  *thr_mgr_p,
         memcpy(&(ofrw_info->client_addr), client_addr, sizeof(struct sockaddr_in));
     ofrw_info->layer4_proto = layer4_proto;
 
-    rc = update_global_htbl(OFRW, ADD,
-                            ofrw_key, ofrw_info,
-                            &new_entry);
-
+    rc = update_global_htbl_lockfree(OFRW, ADD,
+                                     ofrw_key, ofrw_info,
+                                     &new_entry);
+    
 //    g_hash_table_insert(cc_of_global.ofrw_htbl, (gpointer)ofrw_key, 
 //                        (gpointer)ofrw_info);
     
@@ -488,6 +718,7 @@ add_upd_ofrw_rwsocket(int add_fd, adpoll_thread_mgr_t  *thr_mgr_p,
     return rc;
 }
 
+//ofrw_htbl_lock
 cc_of_ret
 find_thrmgr_rwsocket(int sockfd, 
                      adpoll_thread_mgr_t **tmgr) {
@@ -496,19 +727,47 @@ find_thrmgr_rwsocket(int sockfd,
     cc_ofrw_info_t *rwinfo = NULL;
     
     rwkey.rw_sockfd = sockfd;
+    g_mutex_lock(&cc_of_global.ofrw_htbl_lock);
     CC_LOG_DEBUG("%s(%d)", __FUNCTION__, __LINE__);
     print_ofrw_htbl();
     rwinfo = g_hash_table_lookup(cc_of_global.ofrw_htbl, &rwkey);
     if (rwinfo == NULL) {
         CC_LOG_ERROR("%s(%d): could not find rwsock %d in ofrw_htbl",
                      __FUNCTION__, __LINE__, rwkey.rw_sockfd);
+        g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
         return CC_OF_EHTBL;
     }
     
     *tmgr = rwinfo->thr_mgr_p;
+    g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);    
     return status;
 }
 
+cc_of_ret
+find_thrmgr_rwsocket_lockfree(int sockfd, 
+                              adpoll_thread_mgr_t **tmgr) {
+    cc_of_ret status = CC_OF_OK;
+    cc_ofrw_key_t rwkey;
+    cc_ofrw_info_t *rwinfo = NULL;
+    
+    rwkey.rw_sockfd = sockfd;
+    //g_mutex_lock(&cc_of_global.ofrw_htbl);
+    rwinfo = g_hash_table_lookup(cc_of_global.ofrw_htbl, &rwkey);
+    if (rwinfo == NULL) {
+        CC_LOG_ERROR("%s(%d): could not find rwsock %d in ofrw_htbl",
+                     __FUNCTION__, __LINE__, rwkey.rw_sockfd);
+        //g_mutex_unlock(&cc_of_global.ofrw_htbl);
+        return CC_OF_EHTBL;
+    }
+    
+    *tmgr = rwinfo->thr_mgr_p;
+    //g_mutex_unlock(&cc_of_global.ofrw_htbl);
+
+    return status;
+}
+
+
+// caller will acquire ofchann_htbl_lock
 cc_of_ret
 add_upd_ofchann_rwsocket(cc_ofchannel_key_t key,
                          int rwsock)
@@ -531,9 +790,10 @@ add_upd_ofchann_rwsocket(cc_ofchannel_key_t key,
     ofchannel_info->stats.tx_pkt = 0;
     ofchannel_info->stats.tx_drops = 0;
 
-    rc = update_global_htbl(OFCHANN, ADD,
-                            ofchannel_key, ofchannel_info,
-                            &new_entry);
+    rc = update_global_htbl_lockfree(OFCHANN, ADD,
+                                     ofchannel_key, ofchannel_info,
+                                     &new_entry);
+    
     if (!new_entry) {
         g_free(ofchannel_key);
     }
@@ -560,6 +820,7 @@ del_ofchann_rwsocket(int rwsock)
     return CC_OF_OK;
 }
 
+// caller should acquire ofchannel_htbl_lock
 cc_of_ret
 find_ofchann_key_rwsocket(int sockfd, cc_ofchannel_key_t **fd_chann_key) {
 
@@ -598,7 +859,7 @@ find_ofchann_key_rwsocket(int sockfd, cc_ofchannel_key_t **fd_chann_key) {
     return status;
 }
 
-
+// caller will acquire ofdev_htbl lock 
 cc_of_ret add_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
 {
     cc_ofdev_info_t *ofdev = NULL;
@@ -626,10 +887,9 @@ cc_of_ret add_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
     list_elem = (int *)malloc(sizeof(int));
     *list_elem = rwsock;
     
-    g_mutex_lock(&ofdev->ofrw_socket_list_lock);
     ofdev->ofrw_socket_list = g_list_append(ofdev->ofrw_socket_list,
                                                   list_elem);
-    g_mutex_unlock(&ofdev->ofrw_socket_list_lock);
+
 
 //    retval = (update_global_htbl(OFDEV, ADD, ht_dkey, &ofdev, &new_entry));
     CC_LOG_DEBUG("%s(%d): updated ofdev add ", __FUNCTION__, __LINE__);
@@ -650,6 +910,7 @@ ofrwlist_compare_fd (gconstpointer list_elem, gconstpointer compare_fd)
     return 0;
 }
 
+// caller will acqure ofdev & ofrw htbl locks
 cc_of_ret
 del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
 {
@@ -670,14 +931,13 @@ del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
         return CC_OF_EINVAL;
     }
 
-    g_mutex_lock(&ofdev->ofrw_socket_list_lock);
     tmp_list = g_list_find_custom(ofdev->ofrw_socket_list, &rwsock,
                                   ofrwlist_compare_fd);
     if (tmp_list == NULL) {
         CC_LOG_ERROR("%s(%d): could not find rwsock %d "
                      "in ofrw_socket_list",
                      __FUNCTION__, __LINE__, rwsock);
-        g_mutex_unlock(&ofdev->ofrw_socket_list_lock);
+
         return CC_OF_EMISC;
     }
 
@@ -685,11 +945,10 @@ del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock)
     ofdev->ofrw_socket_list = g_list_delete_link(ofdev->ofrw_socket_list,
                                                  tmp_list);
     free(tmp_rwsock);
-    g_mutex_unlock(&ofdev->ofrw_socket_list_lock);
-//(update_global_htbl(OFDEV, ADD, &key, &ofdev, &new_entry));    
     return CC_OF_OK;
 }
 
+// Caller will acquire three htbl locks
 cc_of_ret
 atomic_add_upd_htbls_with_rwsocket(int sockfd, struct sockaddr_in *client_addr,
                                    adpoll_thread_mgr_t  *thr_mgr, 
@@ -762,7 +1021,13 @@ atomic_add_upd_htbls_with_rwsocket(int sockfd, struct sockaddr_in *client_addr,
 guint
 cc_get_count_rw_pollthr(void)
 {
-    return(g_list_length(cc_of_global.ofrw_pollthr_list));
+    guint length = 0;
+
+    g_mutex_lock(&cc_of_global.ofrw_pollthr_list_lock);
+    length = g_list_length(cc_of_global.ofrw_pollthr_list);
+    g_mutex_unlock(&cc_of_global.ofrw_pollthr_list_lock);
+
+    return length;
 }
 
 cc_of_ret
@@ -784,8 +1049,10 @@ cc_create_rw_pollthr(adpoll_thread_mgr_t **tmgr)
     }
 
     /* update the global GList */
+    g_mutex_lock(&cc_of_global.ofrw_pollthr_list_lock);
     cc_of_global.ofrw_pollthr_list =
         g_list_prepend(cc_of_global.ofrw_pollthr_list, (gpointer)tmgr_new);
+    g_mutex_unlock(&cc_of_global.ofrw_pollthr_list_lock);
     CC_LOG_DEBUG("%s(%d): created new rw pollthr %s "
                  "total pollthr %d",
                  __FUNCTION__, __LINE__, tname,
@@ -807,7 +1074,7 @@ cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t **tmgr)
                      __FUNCTION__, __LINE__);
         return(cc_create_rw_pollthr(tmgr));
     }    
-
+    g_mutex_lock(&cc_of_global.ofrw_pollthr_list_lock);
     elem = g_list_first(cc_of_global.ofrw_pollthr_list);
     g_assert(elem != NULL);
 
@@ -816,6 +1083,8 @@ cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t **tmgr)
         CC_LOG_DEBUG("%s(%d) - socket capacity exhausted. create new poll thr",
     /* TODO: Finish this impl */
                     __FUNCTION__, __LINE__);
+        g_mutex_unlock(&cc_of_global.ofrw_pollthr_list_lock);
+        
         return(cc_create_rw_pollthr(tmgr));
     }    
         
@@ -826,7 +1095,8 @@ cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t **tmgr)
     }
     
     *tmgr = (adpoll_thread_mgr_t *)(elem->data);
-    
+    g_mutex_unlock(&cc_of_global.ofrw_pollthr_list_lock);
+
     return(CC_OF_OK);
 }
 
@@ -847,6 +1117,7 @@ cc_pollthr_list_compare_func(adpoll_thread_mgr_t *tmgr1,
     return 0;
 }
 
+// caller will acquire three htbl locks
 cc_of_ret
 cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, adpoll_thr_msg_t *thr_msg)
 {
@@ -882,12 +1153,13 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, adpoll_thr_msg_t *thr_msg)
                          __FUNCTION__, __LINE__);
 
         } else {
-            
+            g_mutex_lock(&cc_of_global.ofrw_pollthr_list_lock);
             tmp_list = g_list_find(cc_of_global.ofrw_pollthr_list, tmgr);
             if (tmp_list == NULL) {
                 CC_LOG_ERROR("%s(%d): could not find thread manager %s "
                              "in ofrw_pollthr_list",
                              __FUNCTION__, __LINE__, tmgr->tname);
+                g_mutex_unlock(&cc_of_global.ofrw_pollthr_list_lock);
                 return(CC_OF_EMISC);
             }
         
@@ -900,6 +1172,7 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, adpoll_thr_msg_t *thr_msg)
                 cc_of_global.ofrw_pollthr_list,
                 tmgr,
                 (GCompareFunc)cc_pollthr_list_compare_func);
+            g_mutex_unlock(&cc_of_global.ofrw_pollthr_list_lock);
         }
     }
     
@@ -933,6 +1206,7 @@ cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, adpoll_thr_msg_t *thr_msg)
 
 }
 
+// callee will acquire all three htbl locks
 cc_of_ret
 cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key,
                          L4_type_e layer4_proto, cc_ofchannel_key_t ofchann_key)
@@ -959,16 +1233,35 @@ cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *thr_msg, cc_ofdev_key_t key,
         CC_LOG_DEBUG("%s(%d): succesfully added fd %d to thread",
                      __FUNCTION__, __LINE__, thr_msg->fd);
         /* add fd to global structures */
+
+        g_mutex_lock(&cc_of_global.ofdev_htbl_lock);
+        g_mutex_lock(&cc_of_global.ofchannel_htbl_lock);
+        g_mutex_lock(&cc_of_global.ofrw_htbl_lock);
+        
         status = atomic_add_upd_htbls_with_rwsocket(thr_msg->fd, NULL,
                                                     tmgr,
                                                     key, 
                                                     layer4_proto,
                                                     ofchann_key);
+
+        g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+        g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+        g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
+        
         if (status < 0) {
             CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
                          cc_of_strerror(status));
             /* Del fd from thr_mgr if update of global structures fails */
-            cc_del_sockfd_rw_pollthr(tmgr, thr_msg); 
+            g_mutex_lock(&cc_of_global.ofdev_htbl_lock);
+            g_mutex_lock(&cc_of_global.ofchannel_htbl_lock);
+            g_mutex_lock(&cc_of_global.ofrw_htbl_lock);
+            
+            cc_del_sockfd_rw_pollthr(tmgr, thr_msg);
+
+            g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+            g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+            g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
+            
             return status;
         }
     }

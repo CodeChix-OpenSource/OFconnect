@@ -1,6 +1,68 @@
 /*
-******************************************
-
-
+****************************************************
+** 	CodeChix ONF Driver Submission
+**	codechix.org - May the code be with you...
+**		Sept. 15, 2013
+*****************************************************
+** License: 	Apache 2.0 (ONF requirement)
+** Description: This is the README file to describe the steps a user would
+** 		need to execute in order to create a Java interface (via SWIG) for
+** 		the CodeChix ONF Driver API which is written in C.
+**
+** Author: 	Rupa Dachere
 ********************************************
 */
+
+The following steps use Ubuntu 12.04 and SWIG 2.0.10.
+These are the steps you need to follow in order to generate a JAR
+file containing all the API's defined in the CC_ONF_Driver/include/cc_of_lib.h
+file.  You should be able to use the JAR file in your test Java code
+to access the underlying controller and driver.
+
+- If you don't have swig, get it - apt-get install swig
+
+- Also make sure you have glib2.0 and JDK - 
+	sudo apt-get install openjdk-7-jdk
+	sudo apt-get install libglib2.0-dev
+
+- Create an interface file called cc_of_driver_java.i.  What this specifies
+  is the API header file as well as which specific functions within the header
+  file we want to wrap with Java.  So, in this particular case, we want to wrap
+  all the functions in cc_of_lib.h.  The first directive (line 5) is specifing
+  the filename.  The second directive (line 8) is specifying that all functions
+  in that file will be wrapped.  The directive for "stdint.h" is to mitigate
+  compile-time resolution.
+  Copy/Paste the following (remove the preceding tabs on each line):
+	%module cc_of_driver_java
+
+	%{
+	#include "stdint.h"
+	#include "../cc_of_lib.h"
+	%}
+	
+	%include "../cc_of_lib.h"
+
+- Run "swig -java -package org.codechix.onf_driver cc_of_driver_java.i"  - this creates
+	a bunch of ".java" files that wrap the necessary API calls.  This also creates
+	a "cc_of_driver_java_wrap.c" file which is an intermediate "map" of the java 
+	function declarations to the c function declarations.
+
+- Modify "cc_of_driver_java_wrap.c" to hard-code "#include <glib.h>.  This is needed if
+	you run into compile-time resolution issues with "gboolean". 
+
+- Run "gcc -c -fpic cc_of_driver_java_wrap.c -I/usr/include/glib-2.0 
+	-I/usr/lib/i386-linux-gnu/glib-2.0/include -lglib-2.0 
+	-I/usr/lib/jvm/java-1.7.0-openjdk-i386/include/ 
+	-I/usr/lib/jvm/java-1.7.0-openjdk-i386/include/linux"
+
+- Run "javac -d . *.java"
+
+- Run "gcc -shared cc_of_driver_java_wrap.o -o lib_cc_of_driver.so"
+	this creates a shared object
+
+- Run "jar cf onf_driver_swig.jar org/codechix/onf_driver/*.class" -
+	this creates the JAR file that you will use.
+
+- Run "javac -classpath ./onf_driver_swig.jar test.java" - where
+	test.java is your test.java is your test file to call the
+	API's as needed.

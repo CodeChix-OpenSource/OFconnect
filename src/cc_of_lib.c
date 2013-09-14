@@ -235,42 +235,6 @@ cc_of_dev_register(uint32_t controller_ipaddr,
     dev_info->accept_chann_func = accept_func;
     dev_info->del_chann_func = del_func; 
 
-    if (cc_of_global.ofdev_type == CONTROLLER) {
-
-        // Create a TCP sockfd for tcp connections
-        dev_info->main_sockfd_tcp =
-            cc_of_global.NET_SVCS[TCP].open_serverfd(*key);
-        if (dev_info->main_sockfd_tcp < 0) {
-	        status = CC_OF_EMISC;
-	        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__,
-                         cc_of_strerror(status));
-            g_free(key);
-            g_free(dev_info);
-	        return status;
-        }
-        CC_LOG_DEBUG("%s(%d): %s", __FUNCTION__, __LINE__,
-                 "Created TCP listenfd");
- 
-        // Create a udp sockfd for udp connections
-
-        dev_info->main_sockfd_udp =
-            cc_of_global.NET_SVCS[UDP].open_serverfd(*key);
-        if (dev_info->main_sockfd_udp < 0) {
-	        status = CC_OF_EMISC;
-	        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__,
-                         cc_of_strerror(status));
-            g_free(key);
-            g_free(dev_info);
-	        return status;
-        }
-
-
-        CC_LOG_DEBUG("%s(%d): %s", __FUNCTION__, __LINE__,
-                 "Created UDP serverfd");
- 
-    }
-
-
     // Add this new device entry to ofdev_htbl
     g_mutex_lock(&cc_of_global.ofdev_htbl_lock);
     g_hash_table_insert(cc_of_global.ofdev_htbl, (gpointer)key, 
@@ -292,6 +256,65 @@ cc_of_dev_register(uint32_t controller_ipaddr,
                      ((cc_ofdev_key_t *)ht_dev_key)->controller_ip_addr);
     }
     g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
+    
+    if (cc_of_global.ofdev_type == CONTROLLER) {
+
+        // Create a TCP sockfd for tcp connections
+        dev_info->main_sockfd_tcp =
+            cc_of_global.NET_SVCS[TCP].open_serverfd(*key);
+        if (dev_info->main_sockfd_tcp < 0) {
+	        status = CC_OF_EMISC;
+	        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__,
+                         cc_of_strerror(status));
+            g_free(key);
+            g_free(dev_info);
+	        return status;
+        }
+        CC_LOG_DEBUG("%s(%d): %s", __FUNCTION__, __LINE__,
+                 "Created TCP listenfd");
+
+        // Create a udp sockfd for udp connections
+
+        dev_info->main_sockfd_udp =
+            cc_of_global.NET_SVCS[UDP].open_serverfd(*key);
+        if (dev_info->main_sockfd_udp < 0) {
+	        status = CC_OF_EMISC;
+	        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__,
+                         cc_of_strerror(status));
+            g_free(key);
+            g_free(dev_info);
+	        return status;
+        }
+
+        CC_LOG_DEBUG("%s(%d): %s", __FUNCTION__, __LINE__,
+                 "Created UDP serverfd");
+ 
+    }
+
+#if 0
+    //add this before the tcp and udp 
+    // Add this new device entry to ofdev_htbl
+    g_mutex_lock(&cc_of_global.ofdev_htbl_lock);
+    g_hash_table_insert(cc_of_global.ofdev_htbl, (gpointer)key, 
+                        (gpointer)dev_info);
+
+
+    if (g_hash_table_lookup_extended(cc_of_global.ofdev_htbl,
+                                     key,
+                                     &ht_dev_key,
+                                     &ht_dev_info) == FALSE) {
+        CC_LOG_ERROR("%s(%d): lookup returned FALSE", __FUNCTION__,
+                     __LINE__);
+    } else {
+        g_assert(ht_dev_key != NULL);
+        g_assert(ht_dev_info != NULL);
+        
+        CC_LOG_DEBUG("%s(%d): actual key returned 0x%x ip address",
+                     __FUNCTION__, __LINE__,
+                     ((cc_ofdev_key_t *)ht_dev_key)->controller_ip_addr);
+    }
+    g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
+#endif
     CC_LOG_INFO("%s(%d): %s , controllerIP:%s, switchIP:%s,"
                 "controllerPort:%hu",__FUNCTION__, __LINE__, 
                 "CC_OF_DEV initilaized successfully", 
@@ -786,11 +809,20 @@ cc_of_send_pkt(uint64_t dp_id, uint8_t aux_id, void *of_msg,
     if (g_hash_table_lookup_extended(cc_of_global.ofchannel_htbl,
                                      (gconstpointer)&chann_id,
                                      &chht_key, &chht_info) == FALSE) {
-        CC_LOG_ERROR("%s(%d): channel %d/%d not found", __FUNCTION__,
-                     __LINE__, (int)chann_id.dp_id,
-                     (int)chann_id.aux_id);
-        g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
-        return CC_OF_EINVAL;
+        /* Check to see any version mismatch and correct 
+         * auxID accordingly. 
+         * TODO: Get the actual version from dev and check
+         */
+        chann_id.aux_id = dp_id;
+        if (g_hash_table_lookup_extended(cc_of_global.ofchannel_htbl,
+                                         (gconstpointer)&chann_id,
+                                         &chht_key, &chht_info) == FALSE) {
+            CC_LOG_ERROR("%s(%d): channel %d/%d not found", __FUNCTION__,
+                         __LINE__, (int)chann_id.dp_id,
+                         (int)chann_id.aux_id);
+            g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+            return CC_OF_EINVAL;
+        }
     }
     chann_info = (cc_ofchannel_info_t *)chht_info;
     send_rwsock = chann_info->rw_sockfd;

@@ -66,6 +66,12 @@ update_global_htbl_lockfree(htbl_type_e htbl_type,
 
 void
 print_ofdev_htbl(void);
+void
+print_ofrw_htbl(void);
+void
+print_ofchann_htbl(void);
+
+
 
 void
 print_ofrw_htbl(void);

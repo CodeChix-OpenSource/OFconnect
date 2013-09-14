@@ -57,10 +57,25 @@ update_global_htbl(htbl_type_e htbl_type,
                    gpointer htbl_data,
                    gboolean *new_entry);
 
+cc_of_ret
+update_global_htbl_lockfree(htbl_type_e htbl_type,
+                            htbl_update_ops_e htbl_op,
+                            gpointer htbl_key,
+                            gpointer htbl_data,
+                            gboolean *new_entry);
+
 void
 print_ofdev_htbl(void);
 void
 print_ofrw_htbl(void);
+void
+print_ofchann_htbl(void);
+
+
+
+void
+print_ofrw_htbl(void);
+
 void
 print_ofchann_htbl(void);
 
@@ -74,6 +89,10 @@ add_upd_ofrw_ofdev_rwsocket(int add_fd);
 
 cc_of_ret
 find_thrmgr_rwsocket(int sockfd,  
+                     adpoll_thread_mgr_t **tmgr);
+
+cc_of_ret
+find_thrmgr_rwsocket_lockfree(int sockfd,  
                      adpoll_thread_mgr_t **tmgr);
 
 cc_of_ret

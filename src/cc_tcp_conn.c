@@ -98,7 +98,7 @@ void process_tcpfd_pollin_func(char *tname,
 
     /* Read data from socket */
 //    if ((read_len = tcp_read(tcp_sockfd, buf, MAXBUF, 0, NULL, NULL)) < 0) {
-    if (read_len = read(tcp_sockfd, buf, MAXBUF) < 0) {
+    if ((read_len = read(tcp_sockfd, buf, MAXBUF)) < 0) {
         if (errno != EAGAIN) {
             CC_LOG_ERROR("%s(%d)[%s]: %s, Error while reading pkt on tcp sockfd: %d",
                          __FUNCTION__, __LINE__, tname,
@@ -107,6 +107,14 @@ void process_tcpfd_pollin_func(char *tname,
             CC_LOG_DEBUG("%s(%d)[%s]: EWOULDBLOCK..!", __FUNCTION__,
                          __LINE__, tname);
         }
+        return;
+    }
+
+    /* Dropping all TCP control pkts */
+    if (read_len == 0) {
+        CC_LOG_DEBUG("%s(%d): Drop this pkt as this is a TCP controll" 
+                     "pkt and not an OFP packet on channel dp_id-%d aux_id-%d",
+                     __FUNCTION__, __LINE__, tcp_sockfd, tcp_sockfd);
         return;
     }
 
@@ -131,6 +139,18 @@ void process_tcpfd_pollin_func(char *tname,
         CC_LOG_ERROR("%s(%d)[%s]: could not find rwsockinfo in ofrw_htbl"
                      "for sockfd-%d", __FUNCTION__, __LINE__, tname,
                      rwkey.rw_sockfd);
+        return;
+    }
+
+    if ((cc_of_global.ofdev_type == CONTROLLER) && 
+        (rwinfo->state != CC_OF_RW_UP)){
+        /* Drop this pkt as the controller is not ready to recv mesgs on this
+         * channel yet. Let it finish initilaizing this channel info and 
+         * then send pkts. 
+         */
+        CC_LOG_DEBUG("%s(%d): Drop this pkt as the controller is not"
+                     "ready to rev mesgs on TCP channel dp_id-%lu aux_id-%u",
+                     __FUNCTION__, __LINE__, tcp_sockfd, tcp_sockfd);
         return;
     }
 
@@ -342,12 +362,16 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
     struct sockaddr_in clientaddr;
     socklen_t addrlen = sizeof(struct sockaddr_in);
     adpoll_thr_msg_t thr_msg;
-    cc_ofdev_info_t *dev_info;
+    cc_ofdev_info_t *dev_info = NULL;
     cc_ofchannel_key_t chann_key;
+    cc_ofrw_key_t rw_key;
+    cc_ofrw_info_t *rw_info = NULL;
+    cc_ofrw_info_t rw_info_new;
     struct timeval timeout;
     int sockflags;
     timeout.tv_sec = 10;
     timeout.tv_usec = 0;
+    gboolean new_entry;
 
     if ((connfd = accept(listenfd, (struct sockaddr *) &clientaddr, 
                          &addrlen)) < 0 ) {
@@ -398,6 +422,25 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
 
     /* Notify the controller about the new TCP channel */
     dev_info->accept_chann_func((uint64_t)connfd, (uint8_t)connfd);
+   
+    /* Update the ofrw_state to CC_OF_RW_UP after controller is 
+     * notified of this new channel 
+     */
+    rw_key.rw_sockfd = connfd;
+    rw_info = g_hash_table_lookup(cc_of_global.ofrw_htbl, &rw_key);
+    if (rw_info == NULL) {
+        CC_LOG_ERROR("%s(%d): could not find rwinfo in ofrw_htbl"
+                     "for the newly connected socket %d", 
+                     __FUNCTION__, __LINE__, connfd);
+        return CC_OF_EHTBL;
+    }
+    memcpy(&rw_info_new, rw_info, sizeof(cc_ofrw_info_t));
+    rw_info_new.state = CC_OF_RW_UP;
+    update_global_htbl(OFRW, ADD, (gpointer)&rw_key, (gpointer)&rw_info_new, 
+                       &new_entry);
+    CC_LOG_DEBUG("%s(%d): Updated TCP channel State to CC_OF_RW_UP",
+                __FUNCTION__, __LINE__);
+    print_ofrw_htbl();
 
     return connfd;
 }

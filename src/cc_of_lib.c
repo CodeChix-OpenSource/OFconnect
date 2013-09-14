@@ -591,9 +591,19 @@ cc_of_send_pkt(uint64_t dp_id, uint8_t aux_id, void *of_msg,
     if (g_hash_table_lookup_extended(cc_of_global.ofchannel_htbl,
                                      (gconstpointer)&chann_id,
                                      &chht_key, &chht_info) == FALSE) {
-        CC_LOG_ERROR("%s(%d): channel %d/%d not found", __FUNCTION__,
-                     __LINE__, (int)chann_id.dp_id,
-                     (int)chann_id.aux_id);
+        /* Check to see any version mismatch and correct 
+         * auxID accordingly. 
+         * TODO: Get the actual version from dev and check
+         */
+        chann_id.aux_id = dp_id;
+        if (g_hash_table_lookup_extended(cc_of_global.ofchannel_htbl,
+                                         (gconstpointer)&chann_id,
+                                         &chht_key, &chht_info) == FALSE) {
+            CC_LOG_ERROR("%s(%d): channel %d/%d not found", __FUNCTION__,
+                         __LINE__, (int)chann_id.dp_id,
+                         (int)chann_id.aux_id);
+            return CC_OF_EINVAL;
+        }
     }
     chann_info = (cc_ofchannel_info_t *)chht_info;
     send_rwsock = chann_info->rw_sockfd;

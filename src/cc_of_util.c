@@ -67,13 +67,15 @@ void cc_of_destroy_generic(gpointer data)
 
 void cc_ofdev_htbl_destroy_val(gpointer data)
 {
+
     cc_ofdev_info_t *dev_info_p;
     dev_info_p = (cc_ofdev_info_t *)data;
-
+    
     g_list_free_full(dev_info_p->ofrw_socket_list,
                      cc_of_destroy_generic);
     
     g_free(data);
+
 }
 
 

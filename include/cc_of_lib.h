@@ -101,7 +101,9 @@ typedef int (*cc_of_recv_pkt)(uint64_t dp_id, uint8_t aux_id,
  *
  */
 typedef int (*cc_of_accept_channel)(uint64_t dummy_dpid,
-                                    uint8_t dummy_auxid);
+                                    uint8_t dummy_auxid,
+									uint32_t client_ip,
+                                    uint16_t client_port);
 
 
 /**

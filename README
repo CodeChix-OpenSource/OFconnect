@@ -40,7 +40,7 @@ Support for Open Flow
 
 Documentation
 -------------
-* Library API - doc/README
+* Library header - include/cc_of_lib.h
 * Unit test - tests/README
 * Java SWIG - include/swig_java/README 
 * Python SWIG - include/swig_python/README

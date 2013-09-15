@@ -474,11 +474,11 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
         CC_LOG_DEBUG("%s(%d): client_ip:%d port:%d\n" , 
 					__FUNCTION__, __LINE__, 
 					(uint32_t)clientaddr.sin_addr.s_addr,
-					(uint16_t)clientaddr.sin_port);
+					(uint16_t)(ntohs(clientaddr.sin_port)));
     /* Notify the controller about the new TCP channel */
     dev_info->accept_chann_func((uint64_t)connfd, (uint8_t)connfd, 
                                 (uint32_t)(clientaddr.sin_addr.s_addr),
-                                (uint16_t)(clientaddr.sin_port));
+                                (uint16_t)(ntohs(clientaddr.sin_port)));
 
     g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
     

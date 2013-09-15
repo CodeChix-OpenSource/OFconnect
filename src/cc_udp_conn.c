@@ -177,7 +177,9 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
 
     if (new_conn) {
         /* Notify the controller about the new UDP channel */
-        devinfo->accept_chann_func(fd_chann_key->dp_id, fd_chann_key->aux_id);
+        devinfo->accept_chann_func(fd_chann_key->dp_id, fd_chann_key->aux_id,
+                                   ntohl(src_addr.sin_addr.s_addr), 
+								   ntohs(src_addr.sin_port));
 
         if (cc_of_global.ofdev_type == CONTROLLER) {
             /* Update the ofrw_state to CC_OF_RW_UP after controller is 

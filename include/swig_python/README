@@ -6,12 +6,13 @@
 *****************************************************
 ** License: 	Apache 2.0 
 **
-** Description: This is the README file to describe the steps a user would
-** 		need to execute in order to create a Python interface (via SWIG) for
-** 		the CodeChix ONF Driver API which is written in C.
+** Description: This is the README file to describe the steps a user 
+**              would need to execute in order to create a Python 
+**              interface (via SWIG) for the CodeChix ONF Driver API 
+**              which is written in C.
 **
 ** Author:      Swapna Iyer	
-********************************************
+*****************************************************
 */
 
 - If you don't have swig, get it - apt-get install swig

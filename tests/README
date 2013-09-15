@@ -4,11 +4,16 @@
 **      codechix.org - May the code be with you...
 **              Sept. 15, 2013
 *****************************************************
-** License: 	Apache 2.0 
 **
-** Description: This is the README file for unit test programs 
-**              in this drectory.
+** License:        Apache 2.0 (ONF requirement)
+** Version:        0.0
+** LibraryName:    LibCCOF
+** GLIB License:   GNU LGPL
+** Description:    Instructions on running tests for LibCCOF
+** Assumptions:    N/A
+** Testing:        N/A
+** Authors:        Deepa Karnad Dhurka
 **
-** Author:      Deepa Karnad Dhurka
 *****************************************************
 */
+

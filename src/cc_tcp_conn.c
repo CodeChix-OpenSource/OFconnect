@@ -143,14 +143,18 @@ void process_tcpfd_pollin_func(char *tname,
         }
         return;
     }
-
+    CC_LOG_DEBUG("%s(%d): RECEIVED PKT LENGTH IS %d on channel dp_id-%d aux_id-%d",
+                  __FUNCTION__, __LINE__, read_len, tcp_sockfd, tcp_sockfd);
+ 
     /* Dropping all TCP control pkts */
+#if 0
     if (read_len == 0) {
         CC_LOG_DEBUG("%s(%d): Drop this pkt as this is a TCP controll" 
                      "pkt and not an OFP packet on channel dp_id-%d aux_id-%d",
                      __FUNCTION__, __LINE__, tcp_sockfd, tcp_sockfd);
         return;
     }
+#endif
 
     CC_LOG_DEBUG("%s(%d)[%s]: Received a message %s",
                  __FUNCTION__, __LINE__, tname, buf);
@@ -196,7 +200,11 @@ void process_tcpfd_pollin_func(char *tname,
         CC_LOG_DEBUG("%s(%d): Drop this pkt as the controller is not"
                      "ready to rev mesgs on TCP channel dp_id-%lu aux_id-%u",
                      __FUNCTION__, __LINE__, tcp_sockfd, tcp_sockfd);
-        return;
+        g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+        g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+        g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
+        
+		return;
     }
 
     devinfo = g_hash_table_lookup(cc_of_global.ofdev_htbl, &(rwinfo->dev_key));
@@ -465,6 +473,9 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
 	    close(connfd);
 	    return status;
     }
+    	        CC_LOG_DEBUG("%s(%d): ....before notifying controller of accept\n" , 
+					__FUNCTION__, __LINE__);
+ 
 
     g_mutex_lock(&cc_of_global.ofdev_htbl_lock);    
     dev_info = g_hash_table_lookup(cc_of_global.ofdev_htbl, &key);
@@ -476,9 +487,17 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
         close(connfd);
         return CC_OF_EHTBL;
     }
-
+	        CC_LOG_DEBUG("%s(%d): notifying controller of accept\n" , 
+					__FUNCTION__, __LINE__);
+ 
+        CC_LOG_DEBUG("%s(%d): client_ip:%d port:%d\n" , 
+					__FUNCTION__, __LINE__, 
+					(uint32_t)clientaddr.sin_addr.s_addr,
+					(uint16_t)clientaddr.sin_port);
     /* Notify the controller about the new TCP channel */
-    dev_info->accept_chann_func((uint64_t)connfd, (uint8_t)connfd);
+    dev_info->accept_chann_func((uint64_t)connfd, (uint8_t)connfd, 
+                                (uint32_t)(clientaddr.sin_addr.s_addr),
+                                (uint16_t)(clientaddr.sin_port));
 
     g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
     

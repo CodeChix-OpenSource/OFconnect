@@ -312,7 +312,7 @@ cc_of_dev_register(uint32_t controller_ipaddr,
                  "Created TCP listenfd");
 
         // Create a udp sockfd for udp connections
-
+#if 0
         dev_info->main_sockfd_udp =
             cc_of_global.NET_SVCS[UDP].open_serverfd(*key);
         if (dev_info->main_sockfd_udp < 0) {
@@ -326,7 +326,8 @@ cc_of_dev_register(uint32_t controller_ipaddr,
 
         CC_LOG_DEBUG("%s(%d): %s", __FUNCTION__, __LINE__,
                  "Created UDP serverfd");
- 
+ #endif
+
     }
 
 #if 0
@@ -919,20 +920,35 @@ cc_of_set_real_dpid_auxid(uint64_t dummy_dpid, uint8_t dummy_auxid,
     if (g_hash_table_lookup_extended(cc_of_global.ofchannel_htbl, 
                                      &ofchann_key_old,
                                      &chht_key, &chht_info) == FALSE) {
-        CC_LOG_ERROR("%s(%d):, could not find ofchann_info in ofchannel_htbl"
-                     "for key dummy_dpid-%lu, dummy_auxid-%u",__FUNCTION__, 
-                     __LINE__, dummy_dpid, dummy_auxid);
-        g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
-        return CC_OF_EINVAL;
+        /* Check to see any version mismatch and correct 
+         * auxID accordingly. 
+         * TODO: Get the actual version from dev and check
+         */
+        ofchann_key_old.aux_id = dummy_dpid;
+        if (g_hash_table_lookup_extended(cc_of_global.ofchannel_htbl,
+                                         &ofchann_key_old,
+                                         &chht_key, &chht_info) == FALSE) {
+			CC_LOG_ERROR("%s(%d):, could not find ofchann_info in ofchannel_htbl"
+				         "for key dummy_dpid-%lu, dummy_auxid-%u",__FUNCTION__, 
+					     __LINE__, dummy_dpid, dummy_auxid);
+			g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+			return CC_OF_EINVAL;
+		}
     }
-    
+    print_ofchann_htbl();
+	
     ofchann_info_old = (cc_ofchannel_info_t *)chht_info;
+	CC_LOG_INFO("%s(%d):ofchannel info -%p",
+                __FUNCTION__, __LINE__, ofchann_info_old);
+
 
     memcpy(&ofchann_info_new, ofchann_info_old, sizeof(cc_ofchannel_info_t));
     status = del_ofchann_rwsocket((int)dummy_dpid);
-    update_global_htbl_lockfree(OFCHANN, DEL, (gpointer)&ofchann_key_new, 
+	print_ofchann_htbl();
+    update_global_htbl_lockfree(OFCHANN, ADD, (gpointer)&ofchann_key_new, 
                        &ofchann_info_new, &new_entry); 
-    g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+    print_ofchann_htbl();
+	g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
     return status;
 }
 

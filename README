@@ -4,10 +4,208 @@
 **      codechix.org - May the code be with you...
 **              Sept. 15, 2013
 *****************************************************
-** License: 	Apache 2.0 
+** License:        Apache 2.0 (ONF requirement)
+** Version:        0.0
+** LibraryName:    LibCCOF
+** GLIB License:   GNU LGPL
 **
 ** Description: This is main README file for libccof
 **
 ** Author:      Deepa Karnad Dhurka
 *****************************************************
 */
+
+This is LIBCCOF version 0.0
+===========================
+Copyright: CodeChix 2013
+
+
+License information
+-------------------
+LIBCCOF license: Apache 2.0
+
+GLIB license: GNU Library General Public License (GNU LGPL)
+
+
+What’s new in this release?
+---------------------------
+
+
+
+Documentation
+-------------
+* Library API - doc/README
+* Unit test - tests/README
+* Java SWIG - include/swig_java/README 
+* Python SWIG - include/swig_python/README
+
+
+Web sites
+---------
+<TODO> https://github.com/codechix/CC-ONF-driver
+
+Bug report
+----------
+<list of known bugs>
+
+Supported systems
+-----------------
+The library has been tested to compile on Ubuntu 12.04 LTS with Intel core.
+
+
+Dependencies
+------------
+glib-2.0
+libglib2.0-dev
+pkg-config
+GNU make 3.81
+GNU binutils
+
+ToDo
+----
+* Statistics support
+* OF awareness and header file parsing
+* OF version negotiation
+* Handling of OF hello and OF echo request-reply
+* Extensible design for header files of different OF versions 
+* Parsing of OF header to extract DPID and AUXID
+* TLS transport
+* Text log file
+* Retry lost connections on switch
+
+
+Distribution structure
+----------------------
+The single Makefile in top level directory compiles library and tests.
+doc/
+include/
+include/swig_java
+include/swig_python
+src/
+tests/
+
+
+These files are generated at run time:
+
+libccof.so.0.0
+obj/
+  cc_log.o 
+  cc_of_lib.o 
+  cc_of_util.o 
+  cc_pollthr_mgr.o  
+  cc_tcp_conn.o
+  cc_udp_conn.o
+tests/*.o, *.exe, log-*.xml, log-*.html for every .c file
+
+Generation of SWIG bindings will create other runtime files in respective SWIG directory.
+
+Contributors 
+------------
+All contributors are members of:
+CodeChix
+http://www.codechix.org/
+https://github.com/codechix
+
+Sorted by last name:
+
+Kajal Bhargava 
+kajal.bhargava1@gmail.com
+https://github.com/kajalusc
+
+
+Ramya Bolla 
+bolla.ramya88@gmail.com
+https://github.com/bollaramya
+
+Rupa Dachere
+rupa@codechix.org
+https://github.com/rdachere
+
+Deepa Dhurka 
+deepa.dhurka@gmail.com
+https://github.com/deepadhurka
+https://github.com/edeedhu
+
+Swapna Iyer
+swapna.iyer@gmail.com
+https://github.com/swapnai
+
+
+Build Instructions
+==================
+Compiling the library
+---------------------
+$ make help
+make objects  : build library objects
+make all      : compile and link library
+make install  : install library
+                Needs root permissions
+make clean    : cleans all object files of library
+make test     : compile all tests
+make runtest  : execute all tests
+                Creates xml and html log files
+make cleantest: cleans all temporary test files
+                including log files
+
+If you want to run the compiled test programs multiple times, either manually invoke gtester for each program, or, run ‘make cleantest’ before every ‘make runtest’
+
+
+Compiling an SDN controller or switch using the library
+-------------------------------------------------------
+1. Install the dependency libraries required by libccof
+
+2. Compile and install the library object
+make all
+make install
+
+The paths to library directory and header file directory are hard-coded. Please modify Makefile to change each path if necessary.
+
+Default location of libccof.so.0 - /usr/local/lib
+Default location of cc_of_lib.h - /usr/local/include
+
+
+3. Include the header file in your code
+#include “cc_of_lib.h”
+
+4. Follow instructions for compilation of glib applications:
+https://developer.gnome.org/glib/stable/glib-compiling.html
+Set an environment variable with necessary glib flags. For example:
+
+GFLAGS='-I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include -lglib-2.0'
+
+Note: the glib flags may vary on each system. Get the exact values from pkg-config output as instructed by Gnome’s manual for glib.
+
+4. Finally, run GCC
+gcc your_program.c $GFLAGS -lccof -I/usr/include/lib
+
+
+
+Design - Examples - Troubleshooting
+===================================
+<under construction>
+
+Device Register - ip address in host byte order
+
+
+1. Address in use error:
+cc_onf_driver_lib-INFO: cc_of_lib_init(104): CC_OF_Library initilaized successfully
+(process:32047): cc_onf_driver_lib-DEBUG: cc_of_dev_register(191): Started Registering Device
+(process:32047): cc_onf_driver_lib-DEBUG: tcp_open_listenfd(272): Starting to open listen fd 6633
+
+(process:32047): cc_onf_driver_lib-CRITICAL **: tcp_open_listenfd(293): Address already in use
+
+(process:32047): cc_onf_driver_lib-CRITICAL **: cc_of_dev_register(240): misc error
+
+
+Solution:
+sudo - 
+lsof -w -n -i tcp:<port>
+fuser -n tcp <port>
+netstat -anp|grep :<port>
+
+kill any process that is using the port in question and try again.
+
+*** most important - .libccof log file creation ****
+
+
+

@@ -84,7 +84,7 @@ typedef int (*cc_of_recv_pkt)(uint64_t dp_id, uint8_t aux_id,
 
 
 /**
- * cc_of_accept
+ * cc_of_accept_channel
  *
  * Description:
  * This callback function is called by the library everytime
@@ -161,6 +161,13 @@ cc_of_ret
 cc_of_dev_free(uint32_t controller_ip,
                uint32_t switch_ip,
                uint16_t controller_L4_port);
+
+//DDHURKA: DO WE NEED TO EXPOSE THIS IN CC_OF_LIB.H?
+//CAN BE USED AS STATIC FUNCTION IN CC_OF_LIB.C
+cc_of_ret
+cc_of_dev_free_lockfree(uint32_t controller_ip,
+                        uint32_t switch_ip,
+                        uint16_t controller_L4_port);
 
 /**
  * cc_of_create_channel

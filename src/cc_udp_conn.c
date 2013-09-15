@@ -52,11 +52,23 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
         return;
     }
 
+    /* Dropping all UDP control pkts */
+    if (read_len == 0) {
+        CC_LOG_DEBUG("%s(%d): Drop this pkt as this is a UDP controll" 
+                     "pkt and not an OFP packet.",
+                     __FUNCTION__, __LINE__);
+        return;
+    }
+
     CC_LOG_INFO("%s(%d):, Read pkt on udp sockfd: %d"
                "from srcIP-%s,srcPort-%u", __FUNCTION__, __LINE__, 
                udp_sockfd, inet_ntoa(src_addr.sin_addr), 
                ntohs(src_addr.sin_port));
 
+    g_mutex_lock(&cc_of_global.ofdev_htbl_lock);
+    g_mutex_lock(&cc_of_global.ofchannel_htbl_lock);
+    g_mutex_lock(&cc_of_global.ofrw_htbl_lock);
+ 
     if (cc_of_global.ofdev_type == CONTROLLER) {
         GHashTableIter ofrw_iter;
         cc_ofrw_key_t *rw_key;
@@ -64,7 +76,7 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
 
         /* Look up ofrw_htbl to see if this src_addr is an old/new connection */
         g_hash_table_iter_init(&ofrw_iter, cc_of_global.ofrw_htbl);
-        if (g_hash_table_iter_next(&ofrw_iter, (gpointer *)&rw_key, 
+        while (g_hash_table_iter_next(&ofrw_iter, (gpointer *)&rw_key, 
                                    (gpointer *)&rw_info)) {
 
             if ((rw_info->client_addr.sin_addr.s_addr == 
@@ -101,6 +113,11 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
                 CC_LOG_ERROR("%s(%d): could not find rwsockinfo in ofrw_htbl"
                              "for sockfd-%d", __FUNCTION__, __LINE__, 
                              tmp_rwkey.rw_sockfd);
+
+                g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+                g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+                g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
+ 
                 return;
             }
             ofchann_key.dp_id = dummy_udp_sockfd;
@@ -121,6 +138,11 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
     if (status < 0) {
         CC_LOG_ERROR("%s(%d): could not find ofchann key for sockfd %d",
                      __FUNCTION__, __LINE__, udp_sockfd);
+
+        g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+        g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+        g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
+ 
         return;
     }
 
@@ -133,6 +155,11 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
     if (rwinfo == NULL) {
         CC_LOG_ERROR("%s(%d): could not find rwsockinfo in ofrw_htbl"
                      "for sockfd-%d", __FUNCTION__, __LINE__, rwkey.rw_sockfd);
+
+        g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+        g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+        g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
+ 
         return;
     }
 
@@ -140,20 +167,79 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
     if (devinfo == NULL) {
         CC_LOG_ERROR("%s(%d): could not find devinfo in ofdev_htbl"
                      "for device", __FUNCTION__, __LINE__);
+
+        g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+        g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+        g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
+ 
         return;
     }
 
     if (new_conn) {
         /* Notify the controller about the new UDP channel */
         devinfo->accept_chann_func(fd_chann_key->dp_id, fd_chann_key->aux_id);
+
+        if (cc_of_global.ofdev_type == CONTROLLER) {
+            /* Update the ofrw_state to CC_OF_RW_UP after controller is 
+             * notified of this new channel 
+             */ 
+            cc_ofrw_key_t rkey;
+            cc_ofrw_info_t *rinfo = NULL;
+            cc_ofrw_info_t rinfo_new;
+            rkey.rw_sockfd = udp_sockfd;
+            gboolean new_entry;
+
+            rinfo = g_hash_table_lookup(cc_of_global.ofrw_htbl, &rkey);
+            if (rinfo == NULL) {
+                CC_LOG_ERROR("%s(%d): could not find rwinfo in ofrw_htbl"
+                             "for the newly connected socket %d", 
+                            __FUNCTION__, __LINE__, udp_sockfd);
+                return;
+            }
+            memcpy(&rinfo_new, rinfo, sizeof(cc_ofrw_info_t));
+            rinfo_new.state = CC_OF_RW_UP;
+            update_global_htbl(OFRW, ADD, (gpointer)&rkey, (gpointer)&rinfo_new, 
+                               &new_entry);
+            CC_LOG_DEBUG("%s(%d): Updated UDP channel State to CC_OF_RW_UP",
+                        __FUNCTION__, __LINE__);
+            print_ofrw_htbl();
+        }
+    }
+
+    if (cc_of_global.ofdev_type == CONTROLLER) {
+        /* Get the current state of channel and send the pkt to controller
+         * only if CC_OF_RW_UP is the state 
+         */
+        cc_ofrw_key_t rkey;
+        cc_ofrw_info_t *rinfo = NULL;
+        rkey.rw_sockfd = udp_sockfd;
+        rinfo = g_hash_table_lookup(cc_of_global.ofrw_htbl, &rkey);
+        if (rinfo == NULL) {
+            CC_LOG_ERROR("%s(%d): could not find rwsockinfo in ofrw_htbl"
+                     "for sockfd-%d", __FUNCTION__, __LINE__, rkey.rw_sockfd);
+            return;
+        }
+        if (rinfo->state != CC_OF_RW_UP) {
+
+            CC_LOG_DEBUG("%s(%d): Drop this pkt as the controller is not"
+                         "ready to rev mesgs on UDP channel dp_id-%lu aux_id-%u",
+                         __FUNCTION__, __LINE__, fd_chann_key->dp_id, 
+                         fd_chann_key->aux_id);
+            return;
+        }
     }
 
     /* Send data to controller/switch via their callback */
     devinfo->recv_func(fd_chann_key->dp_id, fd_chann_key->aux_id, 
                         buf, read_len);
-    CC_LOG_INFO("%s(%d): read a pkt on udp sockfd: %d, aux_id: %lu, dp_id: %u"
+    CC_LOG_INFO("%s(%d): read a pkt on udp sockfd: %d, dp_id: %lu, aux_id: %u"
                 "and sent it to controller/switch", __FUNCTION__, __LINE__, 
                 udp_sockfd, fd_chann_key->dp_id, fd_chann_key->aux_id);
+    
+    g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+    g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+    g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
+ 
 }
 
 
@@ -177,6 +263,9 @@ static void process_udpfd_pollout_func(char *tname UNUSED,
    
     udp_sockfd = data_p->fd;
 
+    g_mutex_lock(&cc_of_global.ofchannel_htbl_lock);
+    g_mutex_lock(&cc_of_global.ofrw_htbl_lock);
+ 
     if (cc_of_global.ofdev_type == CONTROLLER) {
         cc_ofchannel_key_t ckey;
         cc_ofchannel_info_t *cinfo;
@@ -190,6 +279,10 @@ static void process_udpfd_pollout_func(char *tname UNUSED,
             CC_LOG_ERROR("%s(%d): could not find channelinfo in ofchannel_htbl"
                      "for dpID-%lu, auxID-%hu", __FUNCTION__, __LINE__, 
                       ckey.dp_id, ckey.aux_id);
+            
+            g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+            g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+ 
             return;
         }
 
@@ -198,6 +291,10 @@ static void process_udpfd_pollout_func(char *tname UNUSED,
         if (rwinfo == NULL) {
             CC_LOG_ERROR("%s(%d): could not find rwsockinfo in ofrw_htbl"
                          "for sockfd-%d", __FUNCTION__, __LINE__, rwkey.rw_sockfd);
+
+            g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+            g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+ 
             return;
         }
         
@@ -208,6 +305,10 @@ static void process_udpfd_pollout_func(char *tname UNUSED,
         if (getpeername(udp_sockfd,(struct sockaddr *)&dest_addr, &addrlen) < 0) {
             CC_LOG_ERROR("%s(%d): %s, error while getting peername for udp sockfd: %d",
                           __FUNCTION__, __LINE__, strerror(errno), udp_sockfd);
+
+            g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+            g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+ 
             return;
         }
     }
@@ -217,8 +318,16 @@ static void process_udpfd_pollout_func(char *tname UNUSED,
                   0, (struct sockaddr *)&dest_addr, addrlen) < 0) {
         CC_LOG_ERROR("%s(%d): %s, error while sending pkt on udp sockfd: %d", 
                      __FUNCTION__, __LINE__, strerror(errno), udp_sockfd);
+
+        g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+        g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+ 
         return;
     }
+
+    g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+    g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+
     CC_LOG_INFO("%s(%d): sent a pkt out on udp sockfd: %d", __FUNCTION__, 
                 __LINE__, udp_sockfd);
 }
@@ -280,7 +389,7 @@ int udp_open_clientfd(cc_ofdev_key_t key, cc_ofchannel_key_t ofchann_key)
     thr_msg.pollin_func = &process_udpfd_pollin_func;
     thr_msg.pollout_func = &process_udpfd_pollout_func;
         
-    status = cc_add_sockfd_rw_pollthr(&thr_msg, key, TCP, ofchann_key);
+    status = cc_add_sockfd_rw_pollthr(&thr_msg, key, UDP, ofchann_key);
     if (status < 0) {
 	    CC_LOG_ERROR("%s(%d):Error updating udp sockfd in global structures: %s",
                      __FUNCTION__, __LINE__, cc_of_strerror(errno));
@@ -299,9 +408,9 @@ int udp_open_serverfd(cc_ofdev_key_t key)
     int optval = 1;
     struct sockaddr_in serveraddr;
     adpoll_thr_msg_t thr_msg;
-    adpoll_thread_mgr_t *tmgr = NULL;
     cc_of_ret status = CC_OF_OK;
-
+    cc_ofchannel_key_t ckey;
+ 
     if ((serverfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 	    CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(errno));
 	    return -1;
@@ -318,10 +427,15 @@ int udp_open_serverfd(cc_ofdev_key_t key)
     serveraddr.sin_port = htons(key.controller_L4_port);
     serveraddr.sin_addr.s_addr = htonl(key.controller_ip_addr);
     
+
     if (bind(serverfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) < 0) {
 	    CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, cc_of_strerror(errno));
 	    return -1;
     }
+    
+    CC_LOG_DEBUG("%s(%d): UDP SERVER SOCKET %d", __FUNCTION__,
+                 __LINE__, serverfd);
+
 
     // Add udpfd to a pollthrmgr
     thr_msg.fd = serverfd;
@@ -331,26 +445,18 @@ int udp_open_serverfd(cc_ofdev_key_t key)
     thr_msg.pollin_func = &process_udpfd_pollin_func;
     thr_msg.pollout_func = &process_udpfd_pollout_func;
 
+    ckey.dp_id = serverfd;
+    ckey.aux_id = serverfd;
+
     /* A single udp serverfd will serve multiple channnels/clients from
      * switches. This will be stored as dev_info->main_sockfd_udp. 
-     * No need to add this fd in global htbls
      */
-
-    /* find or create a poll thread */
-    status = cc_find_or_create_rw_pollthr(&tmgr);
-
-    if(status < 0) {
-        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
-                     cc_of_strerror(status));
-        return status;
-    } else {
-        /* add the udp fd to the thr */
-        CC_LOG_DEBUG("%s(%d): adding fd %d to thread %s",
-                     __FUNCTION__, __LINE__, thr_msg.fd,
-                     tmgr->tname);
-        adp_thr_mgr_add_del_fd(tmgr, &thr_msg);
-        CC_LOG_DEBUG("%s(%d): succesfully added fd %d to thread",
-                     __FUNCTION__, __LINE__, thr_msg.fd);
+    status = cc_add_sockfd_rw_pollthr(&thr_msg, key, UDP, ckey);
+    if (status < 0) {
+	    CC_LOG_ERROR("%s(%d):Error updating udp sockfd in global structures: %s",
+                     __FUNCTION__, __LINE__, cc_of_strerror(errno));
+	    close(serverfd);
+	    return status;
     }
 
     return serverfd;
@@ -370,7 +476,7 @@ ssize_t udp_write(int sockfd, const void *buf, size_t len, int flags,
     return sendto(sockfd, buf, len, flags, dest_addr, addrlen);
 }
 
-
+//caller should acqure three htbl locks
 int udp_close(int sockfd)
 {
     cc_of_ret status = CC_OF_OK;
@@ -381,9 +487,9 @@ int udp_close(int sockfd)
     thr_msg.fd_type = SOCKET;
     thr_msg.fd_action = DELETE_FD;
 
-    status = find_thrmgr_rwsocket(sockfd, &tmgr);
+    status = find_thrmgr_rwsocket_lockfree(sockfd, &tmgr);
     if (status < 0) {
-        CC_LOG_ERROR("%s(%d): tmgr is NULL for udp sockfd %d",
+        CC_LOG_ERROR("%s(%d): tmgr is NULL for udp sockfd %d"
                      "This could be a dummy_udp_sockfd",__FUNCTION__, 
                      __LINE__, sockfd);
     }

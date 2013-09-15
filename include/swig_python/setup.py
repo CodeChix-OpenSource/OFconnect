@@ -1,3 +1,22 @@
+##
+#######################################################
+##      CodeChix ONF Driver (LibCCOF)
+##      codechix.org - May the code be with you...
+##              Sept. 15, 2013
+#######################################################
+##
+## License:        Apache 2.0 (ONF requirement)
+## Version:        0.0
+## LibraryName:    LibCCOF
+## GLIB License:   GNU LGPL
+## Description:    Setup for SWIG Python for LibCCOF
+## Assumptions:    python2.7, swig 2.0.10
+## Testing:        N/A
+## Authors:        Swapna Iyer 
+##
+#######################################################
+##
+
 from distutils.core import setup, Extension
 
 module1 = Extension('_pyccof',

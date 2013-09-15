@@ -1,6 +1,22 @@
-/*-----------------------------------------------------------------------------*/
-/* Copyright: CodeChix Bay Area Chapter 2013                                   */
-/*-----------------------------------------------------------------------------*/
+/*
+*****************************************************
+**      CodeChix ONF Driver (LibCCOF)
+**      codechix.org - May the code be with you...
+**              Sept. 15, 2013
+*****************************************************
+**
+** License:        Apache 2.0 (ONF requirement)
+** Version:        0.0
+** LibraryName:    LibCCOF
+** GLIB License:   GNU LGPL
+** Description:    Log header for LibCCOF
+** Assumptions:    N/A
+** Testing:        N/A
+** Authors:        Deepa Karnad Dhurka, Ramya Bolla
+**
+*****************************************************
+*/
+
 #ifndef CC_LOG_H
 #define CC_LOG_H
 

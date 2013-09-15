@@ -4,16 +4,20 @@
 **      codechix.org - May the code be with you...
 **              Sept. 15, 2013
 *****************************************************
+**
 ** License:        Apache 2.0 (ONF requirement)
 ** Version:        0.0
 ** LibraryName:    LibCCOF
 ** GLIB License:   GNU LGPL
+** Description:    Top level README - individual subdirs
+**		   might also have their own README files
+** Assumptions:    N/A
+** Testing:        N/A
+** Authors:        Deepa Karnad Dhurka
 **
-** Description: This is main README file for libccof
-**
-** Author:      Deepa Karnad Dhurka
 *****************************************************
 */
+
 
 This is LIBCCOF version 0.0
 ===========================

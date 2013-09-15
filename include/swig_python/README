@@ -1,9 +1,9 @@
 /*
-*****************************************************
-**      CodeChix ONF Driver (LibCCOF)
-**      codechix.org - May the code be with you...
-**              Sept. 15, 2013
-*****************************************************
+**********************************************************************
+**      CodeChix ONF Driver Submission
+**	codechix.org - May the code be with you...
+**		Sept. 15, 2013
+**********************************************************************
 **
 ** License:        Apache 2.0 (ONF requirement)
 ** Version:        0.0
@@ -17,8 +17,28 @@
 ** Testing:        N/A
 ** Authors:        Swapna Iyer
 **
-*****************************************************
+**********************************************************************
 */
 
-- If you don't have swig, get it - apt-get install swig
+Install steps:
+-------------
+
+ 1. Install swig: apt-get install swig              
+
+ 2. Build libccof.so and install (run: make install in ../..)
+
+ 3. Build python module, pyccof:
+     $  sudo python setup.py install ( requires root permissions)
+
+ 4. To clean, before a rebuild of pyccof:
+     $ ./cleanMe.sh
+
+ 5. Start Python after pre-loading glib:
+     $ LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libglib-2.0.so python
+
+ 6. In python:
+     >>> from pyccof import *
+
+
+     
 

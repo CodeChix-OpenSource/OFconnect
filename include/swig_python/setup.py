@@ -27,11 +27,12 @@ module1 = Extension('_pyccof',
                 language=['c'],
                 sources=['./pyccof.i'])
 
-setup(  name            = 'pyccof',
+setup(  name            = 'Ext_pyccof',
         version         = '1.0',
         author          = 'swiyer:CodeChix',
         description     = 'SWIG extended Py module - a generic openflow driver',
         license         = 'copyrighted@CodeChix Bay Area Chapter',
-        url             = '',
         platforms       = ['x86_64'],
-        ext_modules     = [module1] )
+        ext_modules     = [module1],
+        py_modules      = ["pyccof"],
+        )

@@ -48,7 +48,7 @@ cc_of_lib_init(of_dev_type_e dev_type)
 {
     cc_of_ret status = CC_OF_OK;
     CC_LOG_INFO("%s(%d): %s", __FUNCTION__, __LINE__,
-                "LIBCCOF Started Initializing");
+                "CC_OF_LIB Started Initializing");
  
     // Initialize cc_of_global
     cc_of_global.ofdebug_enable = FALSE;
@@ -124,7 +124,7 @@ cc_of_lib_init(of_dev_type_e dev_type)
     CC_LOG_DEBUG("%s(%d): %s", __FUNCTION__, __LINE__,
                  "CREATED POLLTHR FOR rwsockets");
     CC_LOG_INFO("%s(%d): %s", __FUNCTION__, __LINE__,
-                "CC_OF_Library initilaized successfully");
+                "CC_OF_LIB initilaized successfully");
     return status;
 }
 
@@ -197,7 +197,7 @@ cc_of_lib_free()
     // g_hash_table_destroy(cc_of_global.ofdev_htbl);
    
     CC_LOG_INFO("%s(%d): %s", __FUNCTION__, __LINE__,
-                 "LIB_CC_OF cleanup done succesfully");
+                 "CC_OF_LIB cleanup done succesfully");
 
    
     return CC_OF_OK;
@@ -320,7 +320,7 @@ cc_of_dev_register(uint32_t controller_ipaddr,
 
     }
 
-    CC_LOG_INFO("%s(%d):C_OF_DEV initilaized successfully"
+    CC_LOG_INFO("%s(%d):CC_OF_DEV initilaized successfully"
                 "with controllerIp:%s, siwtchIp:%s, controllerL4Port:%hu",
                 __FUNCTION__, __LINE__, 
                 controller_ip, switch_ip, controller_L4_port);

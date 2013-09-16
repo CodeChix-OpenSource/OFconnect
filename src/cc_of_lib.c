@@ -412,7 +412,6 @@ cc_of_dev_free(uint32_t controller_ip_addr,
         gpointer rwht_key = NULL, rwht_info = NULL;
 
         rwkey.rw_sockfd = *((int *)(elem->data));
-        CC_LOG_DEBUG("%s %d here....here", __FUNCTION__, __LINE__);
         CC_LOG_DEBUG("rw sockfd found: %d", rwkey.rw_sockfd);
 
         print_ofrw_htbl();
@@ -602,7 +601,6 @@ cc_of_dev_free_lockfree(uint32_t controller_ip_addr,
         gpointer rwht_key = NULL, rwht_info = NULL;
 
         rwkey.rw_sockfd = *((int *)(elem->data));
-        CC_LOG_DEBUG("%s %d here....here", __FUNCTION__, __LINE__);
         CC_LOG_DEBUG("rw sockfd found: %d", rwkey.rw_sockfd);
 
         print_ofrw_htbl();

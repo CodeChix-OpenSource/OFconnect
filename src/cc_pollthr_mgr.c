@@ -445,7 +445,7 @@ poll_fd_process(adpoll_fd_info_t *data_p,
 static void
 print_fd_list(adpoll_fd_info_t *data_p)
 {
-    CC_LOG_INFO("fd: %d\tfd_type: %d\tpollin_func: %p\tpollout_func: %p \tevents: %x",
+    CC_LOG_DEBUG("fd: %d\tfd_type: %d\tpollin_func: %p\tpollout_func: %p \tevents: %x",
                 data_p->fd, data_p->fd_type, data_p->pollin_func,
                 data_p->pollout_func, data_p->pollfd_entry_p->events);
 }
@@ -473,7 +473,7 @@ pollthr_pri_pipe_process_func(char *tname,
 
     read(data_p->fd, &msg, sizeof(adpoll_thr_msg_t));
         
-    CC_LOG_INFO("%s(%d)[%s]: message received: fd type: %d,"
+    CC_LOG_DEBUG("%s(%d)[%s]: message received: fd type: %d,"
                 " fd %d, fd action %d, poll events %d,"
                 " in func: %p, out func: %p",
                 __FUNCTION__, __LINE__, tname,
@@ -643,9 +643,9 @@ pollthr_data_pipe_process_func(char *tname,
     read(data_p->fd, msg_buf, SEND_MSG_BUF_SIZE);
     msg_p = (adpoll_send_msg_t *)msg_buf;
     
-    CC_LOG_INFO("%s(%d)[%s]: message received: size: %u, fd : %d",
-                __FUNCTION__, __LINE__, tname,
-                msg_p->hdr.msg_size, msg_p->hdr.fd);
+    CC_LOG_DEBUG("%s(%d)[%s]: message received: size: %u, fd : %d",
+                 __FUNCTION__, __LINE__, tname,
+                 msg_p->hdr.msg_size, msg_p->hdr.fd);
 
     send_msg_key_fd = msg_p->hdr.fd;
     data_size = msg_p->hdr.msg_size - sizeof(adpoll_send_msg_hdr_t);
@@ -851,7 +851,6 @@ adp_thr_mgr_poll_thread_func(adpoll_pollthr_data_t *pollthr_data_p)
             }
         }
     }
-/*TBD: free everything in the thread */
     free(thr_pvt_p->pollfd_arr);
     g_list_free_full(thr_pvt_p->fd_list, (GDestroyNotify)fd_entry_free);
     g_mutex_clear(&thr_pvt_p->send_msg_htbl_lock);

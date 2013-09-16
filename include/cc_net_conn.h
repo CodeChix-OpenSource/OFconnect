@@ -24,7 +24,7 @@
 #include "cc_of_lib.h"
 #include <netinet/in.h>
 
-#define MAXBUF 65535 /* Is this optimal? */
+#define MAXBUF 4096 
 #define MAX_OPEN_FILES 1024 * 1024 
 /* For most of the systems(32/64 bit) have this as 
  * hard limit for max files open. 

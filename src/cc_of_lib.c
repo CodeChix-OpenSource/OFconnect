@@ -153,8 +153,6 @@ cc_of_lib_free()
     }
 
 
-    g_mutex_clear(&cc_of_global.ofdev_htbl_lock);
-
     CC_LOG_DEBUG("%s(%d)", __FUNCTION__, __LINE__);
 
     /* Cleaning up all devices should have cleaned both
@@ -170,9 +168,7 @@ cc_of_lib_free()
     g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);    
     g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
 
-    g_mutex_clear(&cc_of_global.ofchannel_htbl_lock);
-    g_mutex_clear(&cc_of_global.ofrw_htbl_lock);
-    
+   
     if (cc_of_global.oflisten_pollthr_p)
         adp_thr_mgr_free(cc_of_global.oflisten_pollthr_p);
     
@@ -185,12 +181,6 @@ cc_of_lib_free()
     g_list_free_full(cc_of_global.ofrw_pollthr_list,
                      cc_of_destroy_generic);
     g_mutex_unlock(&cc_of_global.ofrw_pollthr_list_lock);
-    g_mutex_clear(&cc_of_global.ofrw_pollthr_list_lock);
-
-    /* clear the logging last */
-    cc_of_log_toggle(FALSE);
-    free(cc_of_global.oflog_file);
-    g_mutex_clear(&cc_of_global.oflog_lock);
 
     /* TODO: check if needed - destroying like below causes corruption
        error on the linked list in ofdev node */
@@ -199,7 +189,17 @@ cc_of_lib_free()
     CC_LOG_INFO("%s(%d): %s", __FUNCTION__, __LINE__,
                  "CC_OF_LIB cleanup done succesfully");
 
-   
+    /* clear the logging last */
+    cc_of_log_toggle(FALSE);
+
+
+    g_mutex_clear(&cc_of_global.ofdev_htbl_lock);
+    g_mutex_clear(&cc_of_global.ofchannel_htbl_lock);
+    g_mutex_clear(&cc_of_global.ofrw_htbl_lock);
+    g_mutex_clear(&cc_of_global.ofrw_pollthr_list_lock);
+    free(cc_of_global.oflog_file);
+    //g_mutex_clear(&cc_of_global.oflog_lock);
+  
     return CC_OF_OK;
 }
 
@@ -412,7 +412,6 @@ cc_of_dev_free(uint32_t controller_ip_addr,
         gpointer rwht_key = NULL, rwht_info = NULL;
 
         rwkey.rw_sockfd = *((int *)(elem->data));
-        CC_LOG_DEBUG("%s %d here....here", __FUNCTION__, __LINE__);
         CC_LOG_DEBUG("rw sockfd found: %d", rwkey.rw_sockfd);
 
         print_ofrw_htbl();
@@ -602,7 +601,6 @@ cc_of_dev_free_lockfree(uint32_t controller_ip_addr,
         gpointer rwht_key = NULL, rwht_info = NULL;
 
         rwkey.rw_sockfd = *((int *)(elem->data));
-        CC_LOG_DEBUG("%s %d here....here", __FUNCTION__, __LINE__);
         CC_LOG_DEBUG("rw sockfd found: %d", rwkey.rw_sockfd);
 
         print_ofrw_htbl();

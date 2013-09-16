@@ -149,8 +149,7 @@ util_start(test_data_t *tdata,
     if (cc_of_global.oflisten_pollthr_p == NULL) {
 	    status = CC_OF_EMISC;
 	    cc_of_lib_free();
-	    CC_LOG_FATAL("%s(%d): %s", __FUNCTION__, __LINE__,
-                     cc_of_strerror(status));
+        g_assert(1);
     }
    
     temp_liblog = cc_of_log_read();

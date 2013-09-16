@@ -17,3 +17,16 @@
 *****************************************************
 */
 
+Run 'make runtest' to compile and run the test programs.
+
+For subsequent runs either:
+1. 'make cleantest' to clean object files before recompiling 
+'make runtest'
+
+2. or use individual test .exe with gtester
+gtester --verbose -o=<log.xml> -k <test.exe>
+
+Note: The test program has a dependency on GLib's Testing 
+Framework. These programs may not be executed well by 
+certain versions of GLib. 
+

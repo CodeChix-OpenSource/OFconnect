@@ -78,10 +78,6 @@ void process_listenfd_pollin_func(char *tname UNUSED,
     
     g_mutex_lock(&cc_of_global.ofdev_htbl_lock);
     
-    CC_LOG_DEBUG("%s(%d): %s", __FUNCTION__, __LINE__,
-                    "Inside process_listenfd. going to print ofdev htbl");
-    print_ofdev_htbl();
-
     g_hash_table_iter_init(&ofdev_iter, cc_of_global.ofdev_htbl);
     while (g_hash_table_iter_next(&ofdev_iter, (gpointer *)&dev_key, (gpointer *)&dev_info)) {
         if (dev_info->main_sockfd_tcp == listenfd) {
@@ -143,7 +139,7 @@ void process_tcpfd_pollin_func(char *tname,
         }
         return;
     }
-    CC_LOG_DEBUG("%s(%d): RECEIVED PKT LENGTH IS %d on channel dp_id-%d aux_id-%d",
+    CC_LOG_DEBUG("%s(%d): RECEIVED PKT LENGTH IS %zd on channel dp_id-%d aux_id-%d",
                   __FUNCTION__, __LINE__, read_len, tcp_sockfd, tcp_sockfd);
  
     /* Dropping all TCP control pkts */
@@ -222,7 +218,7 @@ void process_tcpfd_pollin_func(char *tname,
     devinfo->recv_func(fd_chann_key->dp_id, fd_chann_key->aux_id, 
                         buf, read_len);
     
-    CC_LOG_INFO("%s(%d)[%s]: read a pkt on tcp sockfd: %d, dp_id: %lu, aux_id: %u"
+    CC_LOG_DEBUG("%s(%d)[%s]: Read a pkt on tcp sockfd: %d, dp_id: %lu, aux_id: %u"
                 "and sent it to controller/switch", __FUNCTION__, __LINE__,
                 tname, tcp_sockfd, fd_chann_key->dp_id,
                 fd_chann_key->aux_id);
@@ -259,7 +255,7 @@ void process_tcpfd_pollout_func(char *tname,
         return;
     } 
 
-    CC_LOG_INFO("%s(%d)[%s]: sent a pkt out on tcp sockfd: %d", __FUNCTION__, 
+    CC_LOG_DEBUG("%s(%d)[%s]: Sent a pkt out on tcp sockfd: %d", __FUNCTION__, 
                 __LINE__, tname, tcp_sockfd);
 
 }
@@ -293,20 +289,6 @@ cc_of_ret tcp_open_clientfd(cc_ofdev_key_t key, cc_ofchannel_key_t ofchann_key)
     sockflags = fcntl(clientfd,F_GETFL,0);
     g_assert(sockflags != -1);
     fcntl(clientfd, F_SETFL, sockflags | O_NONBLOCK);
-
-    #if 0
-    if ((status = setsockopt(clientfd, SOL_SOCKET, SO_RCVTIMEO,
-                              (char *)&timeout, sizeof(timeout))) < 0) {
-        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
-                     strerror(errno));
-    }
-    
-    if ((status = setsockopt(clientfd, SOL_SOCKET, SO_SNDTIMEO,
-                             (char *)&timeout, sizeof(timeout))) < 0) {
-        CC_LOG_ERROR("%s(%d): %s", __FUNCTION__, __LINE__, 
-                     strerror(errno));
-    }
-    #endif
 
     memset(&localaddr, 0, sizeof(localaddr));
     localaddr.sin_family = AF_INET;
@@ -473,9 +455,6 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
 	    close(connfd);
 	    return status;
     }
-    	        CC_LOG_DEBUG("%s(%d): ....before notifying controller of accept\n" , 
-					__FUNCTION__, __LINE__);
- 
 
     g_mutex_lock(&cc_of_global.ofdev_htbl_lock);    
     dev_info = g_hash_table_lookup(cc_of_global.ofdev_htbl, &key);
@@ -487,13 +466,11 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
         close(connfd);
         return CC_OF_EHTBL;
     }
-	        CC_LOG_DEBUG("%s(%d): notifying controller of accept\n" , 
-					__FUNCTION__, __LINE__);
  
-        CC_LOG_DEBUG("%s(%d): client_ip:%d port:%d\n" , 
-					__FUNCTION__, __LINE__, 
-					(uint32_t)clientaddr.sin_addr.s_addr,
-					(uint16_t)(ntohs(clientaddr.sin_port)));
+    CC_LOG_DEBUG("%s(%d): client_ip:%d port:%d\n" , 
+	    		 __FUNCTION__, __LINE__, 
+				(uint32_t)clientaddr.sin_addr.s_addr,
+				(uint16_t)(ntohs(clientaddr.sin_port)));
     /* Notify the controller about the new TCP channel */
     dev_info->accept_chann_func((uint64_t)connfd, (uint8_t)connfd, 
                                 (uint32_t)(clientaddr.sin_addr.s_addr),
@@ -525,7 +502,6 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
     
     g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);        
 
-
     return connfd;
 }
 
@@ -537,8 +513,7 @@ ssize_t tcp_read(int sockfd, void *buf, size_t len, int flags,
     ssize_t ret_len;
     CC_LOG_DEBUG("%s(%d): Receiving from socket %d", __FUNCTION__, __LINE__, sockfd);
     ret_len = recv(sockfd, buf, len, flags);
-//    ret_len = read(sockfd, buf, len);
-    CC_LOG_DEBUG("%s(%d): Received %d bytes from socket %d", __FUNCTION__, __LINE__, ret_len, sockfd);
+    CC_LOG_DEBUG("%s(%d): Received %zd bytes from socket %d", __FUNCTION__, __LINE__, ret_len, sockfd);
     
     return ret_len;
 } 

@@ -23,7 +23,7 @@
 #define SEND_MSG_BUF_SIZE 1024
 char SEND_MSG_BUF[SEND_MSG_BUF_SIZE];
 
-//error codes
+//CC_OF_LIB error codes
 typedef int cc_of_ret;
 #define CC_OF_OK        0
 #define CC_OF_ESYS     -1  /* syscall, library call error */
@@ -180,7 +180,6 @@ cc_of_dev_free(uint32_t controller_ip,
                uint32_t switch_ip,
                uint16_t controller_L4_port);
 
-//DDHURKA: DO WE NEED TO EXPOSE THIS IN CC_OF_LIB.H?
 //CAN BE USED AS STATIC FUNCTION IN CC_OF_LIB.C
 cc_of_ret
 cc_of_dev_free_lockfree(uint32_t controller_ip,

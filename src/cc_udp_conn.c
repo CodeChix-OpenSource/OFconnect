@@ -79,10 +79,10 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
         return;
     }
 
-    CC_LOG_INFO("%s(%d):, Read pkt on udp sockfd: %d"
-               "from srcIP-%s,srcPort-%u", __FUNCTION__, __LINE__, 
-               udp_sockfd, inet_ntoa(src_addr.sin_addr), 
-               ntohs(src_addr.sin_port));
+    CC_LOG_DEBUG("%s(%d):, Read pkt on udp sockfd: %d"
+                 "from srcIP-%s,srcPort-%u", __FUNCTION__, __LINE__, 
+                 udp_sockfd, inet_ntoa(src_addr.sin_addr), 
+                 ntohs(src_addr.sin_port));
 
     g_mutex_lock(&cc_of_global.ofdev_htbl_lock);
     g_mutex_lock(&cc_of_global.ofchannel_htbl_lock);
@@ -223,7 +223,6 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
                                &new_entry);
             CC_LOG_DEBUG("%s(%d): Updated UDP channel State to CC_OF_RW_UP",
                         __FUNCTION__, __LINE__);
-            print_ofrw_htbl();
         }
     }
 
@@ -253,9 +252,9 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
     /* Send data to controller/switch via their callback */
     devinfo->recv_func(fd_chann_key->dp_id, fd_chann_key->aux_id, 
                         buf, read_len);
-    CC_LOG_INFO("%s(%d): read a pkt on udp sockfd: %d, dp_id: %lu, aux_id: %u"
-                "and sent it to controller/switch", __FUNCTION__, __LINE__, 
-                udp_sockfd, fd_chann_key->dp_id, fd_chann_key->aux_id);
+    CC_LOG_DEBUG("%s(%d): read a pkt on udp sockfd: %d, dp_id: %lu, aux_id: %u"
+                 "and sent it to controller/switch", __FUNCTION__, __LINE__, 
+                 udp_sockfd, fd_chann_key->dp_id, fd_chann_key->aux_id);
     
     g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
     g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
@@ -349,7 +348,7 @@ static void process_udpfd_pollout_func(char *tname UNUSED,
     g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
     g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
 
-    CC_LOG_INFO("%s(%d): sent a pkt out on udp sockfd: %d", __FUNCTION__, 
+    CC_LOG_DEBUG("%s(%d): sent a pkt out on udp sockfd: %d", __FUNCTION__, 
                 __LINE__, udp_sockfd);
 }
 

@@ -1,24 +1,25 @@
 /*
-*****************************************************
-**      CodeChix ONF Driver (LibCCOF)
+****************************************************************
+**      CodeChix OFconnect - OpenFlow Channel Management Library
+**      Copyright CodeChix 2013-2014
 **      codechix.org - May the code be with you...
-**              Sept. 15, 2013
-*****************************************************
+****************************************************************
 **
-** License:        Apache 2.0 (ONF requirement)
-** Version:        0.0
-** LibraryName:    LibCCOF
-** GLIB License:   GNU LGPL
-** Description:    This is the README file to describe the steps a user would
-** 		   need to execute in order to create a Java interface (via SWIG) for
-** 		   the CodeChix ONF Driver API which is written in C.
-** Assumptions:    Depends on glib2.0, openjdk7.0, ubuntu 12.04 and higher,
-**		   swig 2.0.10
-** Testing:        The generated JAR file has not been tested
-** Authors:        Rupa Dachere
-**
-*****************************************************
+** License:             GPL v2
+** Version:             0.0
+** Project/Library:     OFconnect/libccof.so
+** GLIB License:        GNU LGPL
+** Description:         This is the README file to describe the 
+**                      steps a user would need to execute in 
+**                      order to create a Java interface (via SWIG)
+** Assumptions:         Depends on glib2.0, openjdk7.0, 
+**                      ubuntu 12.04 and higher, swig 2.0.10
+** Testing:             The generated JAR file has not been tested
+** Main Contact:        deepa.dhurka@gmail.com
+** Alt. Contact:        organizers@codechix.org
+****************************************************************
 */
+
 
 The following steps use Ubuntu 12.04 and SWIG 2.0.10.
 These are the steps you need to follow in order to generate a JAR

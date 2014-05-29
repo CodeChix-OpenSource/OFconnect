@@ -1,42 +1,40 @@
 /*
-*****************************************************
-**      CodeChix ONF Driver (LibCCOF)
+****************************************************************
+**      CodeChix OFconnect - OpenFlow Channel Management Library
+**      Copyright CodeChix 2013-2014
 **      codechix.org - May the code be with you...
-**              Sept. 15, 2013
-*****************************************************
+****************************************************************
 **
-** License:        Apache 2.0 (ONF requirement)
-** Version:        0.0
-** LibraryName:    LibCCOF
-** GLIB License:   GNU LGPL
-** Description:    Top level README - individual subdirs
-**		   might also have their own README files
-** Assumptions:    N/A
-** Testing:        N/A
-** Authors:        Deepa Karnad Dhurka
+** License:             GPL v2
+** Version:             0.0
+** Project/Library:     OFconnect/libccof.so
+** GLIB License:        GNU LGPL
+** Description:         Top level README
+**                      Individual subdirs also have README files
 **
-** Main Contact:   deepa.dhurka@gmail.com
-** Alt. Contact:   organizers@codechix.org
-*****************************************************
+** Main Contact:        deepa.dhurka@gmail.com
+** Alt. Contact:        organizers@codechix.org
+****************************************************************
 */
 
+This is OFconnect version 0.0
+==============================
+Version 0.0 - Support for Open Flow v1.0 and v1.3.1 tested
+              Agnostic to OpenFlow versions
+              Support for DP ID and AUX ID
+              Transports implemented: TCP and UDP
+              Compiled and tested on Ubuntu 12.04 LTS
+              Compiled on x86 and ARM
 
-This is LIBCCOF version 0.0
-===========================
-Copyright: CodeChix 2013
-
+Copyright: CodeChix 2013-2014
+==============================
+OFconnect was created by CodeChix members in 2013 is being actively
+maintained. This is a live project.
 
 License information
--------------------
-LIBCCOF license: Apache 2.0
-
-GLIB license: GNU Library General Public License (GNU LGPL)
-
-
-What’s new in this release?
----------------------------
-Support for Open Flow
-
+=====================
+OFconnect license: GPL v2
+GLIB license:      GNU Library General Public License (GNU LGPL)
 
 Documentation
 -------------
@@ -45,13 +43,12 @@ Documentation
 * Java SWIG - include/swig_java/README 
 * Python SWIG - include/swig_python/README
 
-
 Web sites
 ---------
 https://github.com/codechix/OFconnect
 
-Bug report
-----------
+Known Limitations
+-----------------
 * Tested only to bring up one switch.
 * Tear down of connection hangs the controller
 * Ping after installing flows does not work
@@ -59,7 +56,6 @@ Bug report
 Supported systems
 -----------------
 The library has been tested to compile on Ubuntu 12.04 LTS with Intel core.
-
 
 Dependencies
 ------------
@@ -306,4 +302,3 @@ netstat -anp|grep :<port>
 
 kill any process that is using the port in question and try again.
 
-*** most important - .libccof log file creation ****

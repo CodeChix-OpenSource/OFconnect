@@ -30,6 +30,10 @@ gboolean
 cc_of_devfree_iter(gpointer key, gpointer value UNUSED,
                    gpointer user_data UNUSED);
 
+static cc_of_ret
+cc_of_dev_free_lockfree(uint32_t controller_ip_addr,
+                        uint32_t switch_ip_addr,
+                        uint16_t controller_L4_port);
 
 inline const char *cc_of_strerror(int errnum)
 {
@@ -524,7 +528,7 @@ cc_of_devfree_iter(gpointer key, gpointer value UNUSED,
 }
 
 
-cc_of_ret
+static cc_of_ret
 cc_of_dev_free_lockfree(uint32_t controller_ip_addr,
                         uint32_t switch_ip_addr,
                         uint16_t controller_L4_port)

@@ -39,7 +39,7 @@ get_time_stamp(){
 
 /* return value: new file fd
    argument returns path and name of log file
-   creates a directory .libccof in $HOME
+   creates a directory .OFconnect in $HOME
    creates a new file with log-<timestamp> name
 */
 FILE *
@@ -55,7 +55,7 @@ create_logfile(char *logfile)
     }
     
     logdir =  malloc(sizeof(char) * 144);
-    sprintf(logdir,"%s/.libccof", getenv("HOME"));
+    sprintf(logdir,"%s/.OFconnect", getenv("HOME"));
     sprintf(logfile,"%s/log-%s", logdir, get_time_stamp());
 
     if (g_mkdir_with_parents(logdir, S_IFDIR | S_IRWXU | S_IRWXG | S_IROTH)) {

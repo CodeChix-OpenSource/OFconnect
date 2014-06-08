@@ -97,10 +97,16 @@ typedef struct cc_ofrw_info_ {
 } cc_ofrw_info_t;
 
 typedef struct net_svcs_ {
+    /* open_clientfd: Client-side operations: connect */
     int (*open_clientfd)(cc_ofdev_key_t key, cc_ofchannel_key_t ofchann_key);
+    
+    /* open_serverfd: Service-side operations: bind, listen */
     int (*open_serverfd)(cc_ofdev_key_t key);
+
     int (*accept_conn)(int listenfd, cc_ofdev_key_t key);
+
     int (*close_conn)(int sockfd);
+
     ssize_t (*read_data)(int sockfd, void *buf, size_t len, int flags,
                          struct sockaddr *src_addr, socklen_t *addrlen);
     ssize_t (*write_data)(int sockfd, const void *buf, size_t len, int flags,

@@ -7,7 +7,7 @@
 **
 ** License:             GPL v2
 ** Version:             0.0
-** Project/Library:     OFconnect/libccof.so
+** Project/Library:     OFconnect, libccof.so
 ** GLIB License:        GNU LGPL
 ** Description:         Top level README
 **                      Individual subdirs also have README files
@@ -100,7 +100,7 @@ obj/
   cc_tcp_conn.o
   cc_udp_conn.o
 tests/*.o, *.exe, log-*.xml, log-*.html for every .c file
-$HOME/.libccof/log-<timestamp> if logging to file is enabled using the API.
+$HOME/.OFconnect/log-<timestamp> if logging to file is enabled using the API.
 
 Generation of SWIG bindings will create other runtime files in respective SWIG directory.
 
@@ -159,7 +159,7 @@ before every ‘make runtest’.
 
 Compiling an SDN controller or switch using the library
 -------------------------------------------------------
-1. Install the dependency libraries required by libccof
+1. Install the dependency libraries
 
 2. Compile and install the library object
 make all
@@ -278,7 +278,7 @@ Please read doc/README for help on API.
 
 Logging and Debugging:
 ---------------------
-A log file is created with timestamp in $HOME/.libccof each time cc_of_log_toggle() is set to TRUE. All logs are printed in this file which can be cleared and read at any point. Logging will continue until it is toggled off.
+A log file is created with timestamp in $HOME/.OFconnect each time cc_of_log_toggle() is set to TRUE. All logs are printed in this file which can be cleared and read at any point. Logging will continue until it is toggled off.
 
 Debugging can be enabled to print debug messages on the console or terminal.
 

@@ -9,7 +9,7 @@
 ** Version:             1.0
 ** Project/Library:     OFconnect, libccof.so
 ** GLIB License:        GNU LGPL
-** Description:    	Global definitions for LibCCOF
+** Description:    	Global definitions
 ** Assumptions:         N/A
 ** Testing:             N/A
 **

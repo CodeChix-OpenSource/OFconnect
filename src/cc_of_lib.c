@@ -9,7 +9,7 @@
 ** Version:             1.0
 ** Project/Library:     OFconnect, libccof.so
 ** GLIB License:        GNU LGPL
-** Description:    	API implementation for LibCCOF
+** Description:    	API implementation
 ** Assumptions:    	Depends on GLib2.0
 ** Testing:             N/A
 **

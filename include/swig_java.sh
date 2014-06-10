@@ -12,8 +12,7 @@
 ## GLIB License:   GNU LGPL
 ## Description:    This script generates all the necessary
 ##		   intermediate files/directories for creation
-##		   of the JAR file for the CodeChix ONF Driver
-##		   API's. 
+##		   of the JAR file for the library API
 ## Assumptions:	   OS Image = Ubuntu. This script assumes that
 ##		   "swig" is installed in /usr/bin/swig.  If not,
 ##		   modify the "run swig" section with the correct path.

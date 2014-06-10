@@ -9,7 +9,7 @@
 ** Version:             1.0
 ** Project/Library:     OFconnect, libccof.so
 ** GLIB License:        GNU LGPL
-** Description:    	Log header for LibCCOF
+** Description:    	Log header
 ** Assumptions:    	N/A
 ** Testing:        	N/A
 **

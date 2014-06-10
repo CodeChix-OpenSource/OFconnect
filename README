@@ -17,14 +17,14 @@
 ****************************************************************
 */
 
-This is OFconnect version 0.0
-==============================
-Version 0.0 - Support for Open Flow v1.0 and v1.3.1 tested
-              Agnostic to OpenFlow versions
-              Support for DP ID and AUX ID
-              Transports implemented: TCP and UDP
-              Compiled and tested on Ubuntu 12.04 LTS
-              Compiled on x86 and ARM
+Changes in latest version
+=========================
+Support for Open Flow v1.0 and v1.3.1 tested
+Agnostic to OpenFlow versions
+Support for DP ID and AUX ID
+Transports implemented: TCP and UDP
+Compiled and tested on Ubuntu 12.04 LTS
+Compiled on x86 and ARM
 
 Copyright: CodeChix 2013-2014
 ==============================

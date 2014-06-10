@@ -43,10 +43,6 @@ Documentation
 * Java SWIG - include/swig_java/README 
 * Python SWIG - include/swig_python/README
 
-Web sites
----------
-https://github.com/codechix/OFconnect
-
 Known Limitations
 -----------------
 * Tested only to bring up one switch.

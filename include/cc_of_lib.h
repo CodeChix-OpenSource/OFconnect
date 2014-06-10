@@ -6,13 +6,12 @@
 ****************************************************************
 **
 ** License:             GPL v2
-** Version:             0.0
-** Project/Library:     OFconnect/libccof.so
+** Version:             1.0
+** Project/Library:     OFconnect, libccof.so
 ** GLIB License:        GNU LGPL
 ** Description:         API Declarations for OFconnect
-** Authors:    	        Deepa Karnad Dhurka
-**                      Ramya Bolla
-**                      Kajal Bhargava
+** Assumptions:         N/A
+** Testing:             N/A
 **
 ** Main Contact:        deepa.dhurka@gmail.com
 ** Alt. Contact:        organizers@codechix.org

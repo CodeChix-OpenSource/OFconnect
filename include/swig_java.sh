@@ -1,14 +1,14 @@
 #!/bin/bash
 
 ##################################################################
-##      CodeChix ONF Driver (LibCCOF)
+##      CodeChix OFconnect - OpenFlow Channel Management Library
+##      Copyright CodeChix 2013-2014
 ##      codechix.org - May the code be with you...
-##              Sept. 15, 2013
 ##################################################################
 ##
-## License:        Apache 2.0 (ONF requirement)
-## Version:        0.0
-## LibraryName:    LibCCOF
+## License:        GPL v2
+## Version:        1.0
+## LibraryName:    OFconnect, libccof.so
 ## GLIB License:   GNU LGPL
 ## Description:    This script generates all the necessary
 ##		   intermediate files/directories for creation
@@ -23,7 +23,8 @@
 ##		   "javac -classpath ./onf_driver_swig.jar test.java"
 ##		   and then run with
 ##		   "java -classpath .:./onf_driver_swig.jar test"
-## Authors:        Rupa Dachere
+## Main Contact:   deepa.dhurka@gmail.com
+## Alt. Contact:   organizers@codechix.org
 ##
 ##################################################################
 

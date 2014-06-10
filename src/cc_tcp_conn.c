@@ -9,7 +9,7 @@
 ** Version:             1.0
 ** Project/Library:     OFconnect, libccof.so
 ** GLIB License:        GNU LGPL
-** Description:    	TCP implementation for LibCCOF
+** Description:    	TCP implementation
 ** Assumptions:         N/A
 ** Testing:             N/A
 **

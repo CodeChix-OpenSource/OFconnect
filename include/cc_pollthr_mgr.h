@@ -9,7 +9,7 @@
 ** Version:             1.0
 ** Project/Library:     OFconnect, libccof.so
 ** GLIB License:        GNU LGPL
-** Description:    	Poll thread definitions for LibCCOF
+** Description:    	Poll thread definitions
 ** Assumptions:         N/A
 ** Testing:             N/A
 **

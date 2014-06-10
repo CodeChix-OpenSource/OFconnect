@@ -8,7 +8,7 @@
 ## Version:             1.0
 ## Project/Library:     OFconnect, libccof.so
 ## GLIB License:        GNU LGPL
-## Description:    	Setup for SWIG Python for LibCCOF
+## Description:    	Setup for SWIG Python
 ## Assumptions:    	python2.7, swig 2.0.10
 ## Testing:             N/A
 ##

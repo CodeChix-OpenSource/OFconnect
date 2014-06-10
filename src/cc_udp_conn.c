@@ -9,7 +9,7 @@
 ** Version:             1.0
 ** Project/Library:     OFconnect, libccof.so
 ** GLIB License:        GNU LGPL
-** Description:    	UDP implementation for LibCCOF
+** Description:    	UDP implementation
 ** Assumptions:         N/A
 ** Testing:             N/A
 **

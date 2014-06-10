@@ -1,19 +1,19 @@
-##
 #######################################################
-##      CodeChix ONF Driver (LibCCOF)
+##      CodeChix OFconnect - OpenFlow Channel Management Library
+##      Copyright CodeChix 2013-2014
 ##      codechix.org - May the code be with you...
-##              Sept. 15, 2013
 #######################################################
 ##
-## License:        Apache 2.0 (ONF requirement)
-## Version:        0.0
-## LibraryName:    LibCCOF
-## GLIB License:   GNU LGPL
-## Description:    Setup for SWIG Python for LibCCOF
-## Assumptions:    python2.7, swig 2.0.10
-## Testing:        N/A
-## Authors:        Swapna Iyer 
+## License:             GPL v2
+## Version:             1.0
+## Project/Library:     OFconnect, libccof.so
+## GLIB License:        GNU LGPL
+## Description:    	Setup for SWIG Python for LibCCOF
+## Assumptions:    	python2.7, swig 2.0.10
+## Testing:             N/A
 ##
+## Main Contact:        deepa.dhurka@gmail.com
+## Alt. Contact:        organizers@codechix.org
 #######################################################
 ##
 

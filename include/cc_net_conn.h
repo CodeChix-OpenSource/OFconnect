@@ -1,20 +1,21 @@
 /*
-*****************************************************
-**      CodeChix ONF Driver (LibCCOF)
+****************************************************************
+**      CodeChix OFconnect - OpenFlow Channel Management Library
+**      Copyright CodeChix 2013-2014
 **      codechix.org - May the code be with you...
-**              Sept. 15, 2013
-*****************************************************
+****************************************************************
 **
-** License:        Apache 2.0 (ONF requirement)
-** Version:        0.0
-** LibraryName:    LibCCOF
-** GLIB License:   GNU LGPL
-** Description:    Network connection definitions for LibCCOF
-** Assumptions:    N/A
-** Testing:        N/A
-** Authors:        Deepa Karnad Dhurka, Ramya Bolla
+** License:             GPL v2
+** Version:             1.0
+** Project/Library:     OFconnect, libccof.so
+** GLIB License:        GNU LGPL
+** Description:    	Network connection definitions
+** Assumptions:         N/A
+** Testing:             N/A
 **
-*****************************************************
+** Main Contact:        deepa.dhurka@gmail.com
+** Alt. Contact:        organizers@codechix.org
+****************************************************************
 */
 
 #ifndef CC_NET_CONN_H
@@ -97,10 +98,16 @@ typedef struct cc_ofrw_info_ {
 } cc_ofrw_info_t;
 
 typedef struct net_svcs_ {
+    /* open_clientfd: Client-side operations: connect */
     int (*open_clientfd)(cc_ofdev_key_t key, cc_ofchannel_key_t ofchann_key);
+    
+    /* open_serverfd: Service-side operations: bind, listen */
     int (*open_serverfd)(cc_ofdev_key_t key);
+
     int (*accept_conn)(int listenfd, cc_ofdev_key_t key);
+
     int (*close_conn)(int sockfd);
+
     ssize_t (*read_data)(int sockfd, void *buf, size_t len, int flags,
                          struct sockaddr *src_addr, socklen_t *addrlen);
     ssize_t (*write_data)(int sockfd, const void *buf, size_t len, int flags,

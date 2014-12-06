@@ -1,21 +1,23 @@
 /*
-*****************************************************
-**      CodeChix ONF Driver (LibCCOF)
+****************************************************************
+**      CodeChix OFconnect - OpenFlow Channel Management Library
+**      Copyright CodeChix 2013-2014
 **      codechix.org - May the code be with you...
-**              Sept. 15, 2013
-*****************************************************
+****************************************************************
 **
-** License:        Apache 2.0 (ONF requirement)
-** Version:        0.0
-** LibraryName:    LibCCOF
-** GLIB License:   GNU LGPL
-** Description:    Log implementation for LibCCOF
-** Assumptions:    N/A
-** Testing:        N/A
-** Authors:        Deepa Karnad Dhurka, Ramya Bolla
+** License:             GPL v2
+** Version:             1.0
+** Project/Library:     OFconnect, libccof.so
+** GLIB License:        GNU LGPL
+** Description:    	Log implementation
+** Assumptions:         N/A
+** Testing:             N/A
 **
-*****************************************************
+** Main Contact:        deepa.dhurka@gmail.com
+** Alt. Contact:        organizers@codechix.org
+****************************************************************
 */
+
 #include "cc_log.h"
 #include "cc_of_global.h"
 
@@ -39,7 +41,7 @@ get_time_stamp(){
 
 /* return value: new file fd
    argument returns path and name of log file
-   creates a directory .libccof in $HOME
+   creates a directory .OFconnect in $HOME
    creates a new file with log-<timestamp> name
 */
 FILE *
@@ -55,7 +57,7 @@ create_logfile(char *logfile)
     }
     
     logdir =  malloc(sizeof(char) * 144);
-    sprintf(logdir,"%s/.libccof", getenv("HOME"));
+    sprintf(logdir,"%s/.OFconnect", getenv("HOME"));
     sprintf(logfile,"%s/log-%s", logdir, get_time_stamp());
 
     if (g_mkdir_with_parents(logdir, S_IFDIR | S_IRWXU | S_IRWXG | S_IROTH)) {

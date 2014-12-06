@@ -1,20 +1,20 @@
 ##
 ######################################################
-##      CodeChix ONF Driver (LibCCOF)
+##      CodeChix OFconnect - OpenFlow Channel Management Library
+##      Copyright CodeChix 2013-2014
 ##      codechix.org - May the code be with you...
-##              Sept. 15, 2013
 ######################################################
 ##
-## License:        Apache 2.0 (ONF requirement)
-## Version:        0.0
-## LibraryName:    LibCCOF
-## GLIB License:   GNU LGPL
-## Description:    Top level Makfile for LibCCOF
-## Assumptions:    N/A
-## Testing:        Run "sudo make install". Make sure glib2.0 is
-##		   installed before doing this.
-## Authors:        Deepa Karnad Dhurka
+## License:             GPL v2
+## Version:             1.0
+## Project/Library:     OFconnect, libccof.so
+## GLIB License:        GNU LGPL
+## Description:         Top level Makefile
+## Testing:        	Run "sudo make install". Make sure glib2.0 is
+##		   	installed before doing this.
 ##
+## Main Contact:        deepa.dhurka@gmail.com
+## Alt. Contact:        organizers@codechix.org
 ######################################################
 ##
 

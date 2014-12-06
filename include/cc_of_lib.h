@@ -1,20 +1,21 @@
 /*
-*****************************************************
-**      CodeChix ONF Driver (LibCCOF)
+****************************************************************
+**      CodeChix OFconnect - OpenFlow Channel Management Library
+**      Copyright CodeChix 2013-2014
 **      codechix.org - May the code be with you...
-**              Sept. 15, 2013
-*****************************************************
+****************************************************************
 **
-** License:        Apache 2.0 (ONF requirement)
-** Version:        0.0
-** LibraryName:    LibCCOF
-** GLIB License:   GNU LGPL
-** Description:	   API header for LibCCOF
-** Assumptions:    Depends on Glib2.0
-** Testing:	   N/A
-** Authors:    	   Deepa Karnad Dhurka, Ramya Bolla, Kajal Bhargava
+** License:             GPL v2
+** Version:             1.0
+** Project/Library:     OFconnect, libccof.so
+** GLIB License:        GNU LGPL
+** Description:         API Declarations for OFconnect
+** Assumptions:         N/A
+** Testing:             N/A
 **
-*****************************************************
+** Main Contact:        deepa.dhurka@gmail.com
+** Alt. Contact:        organizers@codechix.org
+****************************************************************
 */
 
 #ifndef CC_OF_LIB_H
@@ -23,7 +24,7 @@
 #define SEND_MSG_BUF_SIZE 1024
 char SEND_MSG_BUF[SEND_MSG_BUF_SIZE];
 
-//CC_OF_LIB error codes
+/* CC_OF_LIB error codes */
 typedef int cc_of_ret;
 #define CC_OF_OK        0
 #define CC_OF_ESYS     -1  /* syscall, library call error */
@@ -37,7 +38,7 @@ typedef int cc_of_ret;
 #define CC_OF_EEXIST   -9  /* already exists */
 #define CC_OF_EMISC    -10 /* misc error */
 
-
+/* String definitions for error codes */
 static const char * cc_of_errtable[] = {
     "okay",
     "syscall/library call failed",
@@ -62,7 +63,6 @@ typedef enum cc_ofver_ {
 } cc_ofver_e;
 
 typedef enum L4_type_ {
-    /* used for array index */
     TCP = 0,
     TLS,
     UDP,
@@ -79,46 +79,33 @@ typedef enum of_dev_type_ {
 
 #define CC_OF_ERRTABLE_SIZE (sizeof(cc_of_errtable) / sizeof(cc_of_errtable[0]))
 
-
-/**
- * cc_of_recv_pkt
- *
- * Description:
- * This callback function is called by the library when a packet is received
- * from the socket.
- *
- * Returns:
- * Status
- *
- * Notes:
- * 01. This will be a callback. 
- *
+/*
+ *****************************************
+ *          LIBRARY CALLBACKS            *
+ *****************************************
  */
-typedef int (*cc_of_recv_pkt)(uint64_t dp_id, uint8_t aux_id,
-                              void *of_msg, 
-                              size_t of_msg_len);
-
-
 /**
  * cc_of_accept_channel
  *
  * Description:
- * This callback function is called by the library everytime
- * we accept a new connection. This is to notify the controller 
- * that there is a new connection(of_channel).
+ * Callback Function
+ * Called any time the library accepts a new connection.
+ * Notifies the device (controller) of a new connection.
  *
- * No-op for switch
+ * Not supported for switch device type
+ *
+ * Arguments:
+ * dummy_dpid: DPID assigned by library before real DPID is learnt
+ * dummy_auxid: AUXID assigned by library before real AUXID is learnt
+ * client_ip: IP address of the peering switch
+ * client_port: L4 port of the peering switch
  *
  * Returns:
  * Status
- *
- * Notes:
- * 01. This will be a callback. 
- *
  */
 typedef int (*cc_of_accept_channel)(uint64_t dummy_dpid,
                                     uint8_t dummy_auxid,
-									uint32_t client_ip,
+                                    uint32_t client_ip,
                                     uint16_t client_port);
 
 
@@ -126,72 +113,156 @@ typedef int (*cc_of_accept_channel)(uint64_t dummy_dpid,
  * cc_of_delete_channel
  *
  * Description:
- * This callback function is called by the library everytime
- * we a connection is deleted. This is to notify the 
- * controller or switch that a connection is deleted.
+ * Callback Function
+ * Called any time the library deletes a connection.
+ *
+ * Arguments:
+ * dpid: DPID of channel to be deleted
+ * auxid: AUXID of channel to be deleted
  *
  * Returns:
  * Status
- *
- * Notes:
- * 01. This will be a callback. 
- *
  */
 typedef int (*cc_of_delete_channel)(uint64_t dpid,
                                     uint8_t auxid);
 
+
+/**
+ * cc_of_recv_pkt
+ *
+ * Description:
+ * Callback Function
+ * Called any time a packet is received from the socket.
+ *
+ * Arguments:
+ * dp_id: DPID of the channel on which pkt was rx
+ * aux_id: AUXID of the channel on which pkt was rx
+ * of_msg: pointer to OF packet
+ * of_msg_len: size of OF packet in bytes
+ *
+ * Returns:
+ * Status
+ */
+typedef int (*cc_of_recv_pkt)(uint64_t dp_id, uint8_t aux_id,
+                              void *of_msg, 
+                              size_t of_msg_len);
+
+
+
+/*
+ *****************************************
+ *             LIBRARY API               *
+ *****************************************
+ */
 /**
  * cc_of_lib_init
  *
  * Description:
- * This initializes the library.
+ * Initializes the library.
+ *
+ * Arguments:
+ * dev_type: specify if the calling SDN appliance is controller
+ *           or switch
+ *
+ * Returns:
+ * Status
+ */
+cc_of_ret 
+cc_of_lib_init(of_dev_type_e dev_type);
+
+
+/**
+ * cc_of_lib_free
+ *
+ * Description:
+ * Frees the library.
+ *
+ * Returns:
+ * Status
+ */
+cc_of_ret
+cc_of_lib_free(void);
+
+
+/**
+ * cc_of_dev_register
+ *
+ * Description:
+ * If device type is controller:
+ *     Register a specific combination of controller IP + L4 port
+ * If device type is switch:
+ *     Register a specific combination of controller (IP + L4 port)
+ *         and switch IP
+ * The library calls this unique combination a 'device'
+ * If controller is active on multiple IPs and ports, register once
+ *    for each combination.
+ * If switch is active on multiple IPs or connecting to multiple
+ *    controllers, register once for each such combination.
+ *
+ * Arguments:
+ * controller_ip: IPv4 address of controller. 
+ * switch_ip: IPv4 address of switch.
+ *            Used only if calling device is a switch.
+ * max_ofver: max OpenFlow version supported by device
+ *            Unused field.
+ * recv_func: callback function registration
+ *            (see cc_of_recv_pkt for info)
+ * accept_func: callback function registration
+ *              (see cc_of_accept_channel for info)
+ * del_func: callback function registration
+ *           (see cc_of_delete_channel for info)
  *
  * Returns:
  * Status
  *
  * Notes:
- * 01. The library can be initialized in Controller/Switch device type. 
- *
- * 02. The driver mode can be Server/Client.  
- *
- * 03. The MAX_OF_VERSION is the maximum OpenFlow protocol version that 
- *     can be supported by the controller/switch. The library will reject
- *     connections for OpenFlow versions which are not supported.  
- *     
+ * May need enhancement to support TLS
  */
-cc_of_ret 
-cc_of_lib_init(of_dev_type_e dev_type);
-
-cc_of_ret
-cc_of_lib_free(void);
-
 cc_of_ret
 cc_of_dev_register(uint32_t controller_ip,
                    uint32_t switch_ip,
                    uint16_t controller_L4_port,
                    cc_ofver_e max_ofver,
-                   cc_of_recv_pkt recv_func /*func ptr*/,
+                   cc_of_recv_pkt recv_func,
                    cc_of_accept_channel accept_func,
                    cc_of_delete_channel del_func);
-/* possible additional fields for TLS certificate */
 
+
+/**
+ * cc_of_dev_free
+ *
+ * Description:
+ * This function releases the specific device registration
+ *
+ * Arguments:
+ * controller_ip: IPv4 address of controller
+ * switch_ip: IPv4 address of switch (used only when device is switch)
+ * controller_L4_port: Transport port number of controller
+ *
+ * Returns:
+ * Status
+ *
+ */
 cc_of_ret
 cc_of_dev_free(uint32_t controller_ip,
                uint32_t switch_ip,
                uint16_t controller_L4_port);
 
-//CAN BE USED AS STATIC FUNCTION IN CC_OF_LIB.C
-cc_of_ret
-cc_of_dev_free_lockfree(uint32_t controller_ip,
-                        uint32_t switch_ip,
-                        uint16_t controller_L4_port);
-
 /**
  * cc_of_create_channel
- * Note: this api will only be made available to the switch.
  *
  * Description:
  * This function creates the OF connection based on DP_ID and AUX-ID
+ * The library supports this only for the switch device type
+ *
+ * Arguments:
+ * controller_ip: IPv4 of controller to connect to
+ * switch_ip: IPv4 of switch to connect from
+ * controller_L4_port: layer 4 port number of controller
+ * dp_id: switch-generated DPID, used in OF messages
+ * aux_id: switch-generated AUXID, used in OF messages
+ * l4_proto: Transport protocol for the connection
+ *           Used only by the switch device type
  *
  * Returns:
  * Status
@@ -203,30 +274,29 @@ cc_of_create_channel(uint32_t controller_ip,
                      uint16_t controller_L4_port,
                      uint64_t dp_id, 
                      uint8_t aux_id,
-                     L4_type_e l4_proto); /*noop for controller */
+                     L4_type_e l4_proto);
+
+
 /**
  * cc_of_destroy_channel
  *
  * Description:
- * This function destroys the OF connection based on given parameters
+ * Brings down the OF connection
+ * Supported only for switch device type
  *
  * Returns:
  * Status
- *
- * Notes:
- * 01. Based on the dp-id + aux-id combination of the switch, the OpenFlow
- *     connection will be terminated.
  */
 cc_of_ret 
 cc_of_destroy_channel(uint64_t dp_id, 
-                      uint8_t aux_id); /*noop for controller */
+                      uint8_t aux_id);
 
 
 /**
  * cc_of_send_pkt
  * 
  * Description:
- * This function sends the OF packet to the library to send it to the switch.
+ * Send the OF packet to the library to send it to the peering SDN device
  *
  * Returns:
  * Status
@@ -239,14 +309,14 @@ cc_of_send_pkt(uint64_t dp_id,
 
 
 /**
- * cc_of_get_real_dpid_auxid
+ * cc_of_set_real_dpid_auxid
  * 
  * Description:
  * The controller has to call this function everytime it 
  * establishes a new connection(of_channel). The controller 
  * determines the dp_id/aux_id from the OFP_FEATURES_REQ packet 
- * and notifies the id's to oflib library. Until then oflib 
- * will be using a dummy dp_id/aux_id for the of_channel.
+ * and notifies the id's to oflib library. Until then the library
+ * uses a generated dummy dp_id/aux_id for the of_channel.
  *
  * No-op for switch
  *
@@ -264,8 +334,7 @@ cc_of_set_real_dpid_auxid(uint64_t dummy_dpid,
  * cc_of_get_conn_stats
  *
  * Description:
- * This function returns the connection stats to the controller/switch based on
- * the dp-id + sw-id.
+ * Query of connection statistics
  *
  * Returns:
  * Status
@@ -291,6 +360,9 @@ cc_of_debug_toggle(gboolean debug_on);
  *
  * Description:
  * Enables or disables message logging in global log file
+ * A new log file is generated any time this is called
+ *     with logging_on TRUE
+ * Path: $HOME/.OFconnect/log-<timestamp>
  */
 void
 cc_of_log_toggle(gboolean logging_on);
@@ -299,11 +371,10 @@ cc_of_log_toggle(gboolean logging_on);
  * cc_of_log_read
  *
  * Description:
- * Read contents of log file.
+ * Return contents of log file as a character stream
  *
  * NOTE: Necessary to g_free the returned pointer
  */
-
 char *
 cc_of_log_read();
 
@@ -311,10 +382,9 @@ cc_of_log_read();
  * cc_of_log_clear
  *
  * Description:
- * Clear contents of log file.
+ * Clear contents of global log file.
  *
  */
-
 void
 cc_of_log_clear(void);
 

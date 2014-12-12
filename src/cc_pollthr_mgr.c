@@ -52,6 +52,8 @@ fdinfo_compare_fd(gconstpointer list_elem, gconstpointer compare_fd)
     }
     return 0;
 }
+
+/* Instantiation of an ADPoll-Thread Manager*/
 adpoll_thread_mgr_t *
 adp_thr_mgr_new(char *tname,
                 uint32_t max_sockets,
@@ -63,15 +65,16 @@ adp_thr_mgr_new(char *tname,
     int tname_len;
     adpoll_thr_msg_t add_datapipe_msg;
 
+    /* Allocate for the ADPoll-Thread Manager object
+       This is stored in a global list by the calling function
+    */
     this = (adpoll_thread_mgr_t *)malloc(sizeof(adpoll_thread_mgr_t));
 
+    /* Initialize the cond-vars for pipe access and thread init */
     this->add_del_pipe_cv_mutex = g_mutex_new();
     this->add_del_pipe_cv_cond = g_cond_new();
     this->adp_thr_init_cv_mutex = g_mutex_new();
     this->adp_thr_init_cv_cond = g_cond_new();
-    
-    thread_user_data = (adpoll_pollthr_data_t *)
-        malloc(sizeof(adpoll_pollthr_data_t));
 
     while ((tname[i] != 0) && (i < (MAX_NAME_LEN - 2))) {
         this->tname[i] = tname[i];
@@ -81,7 +84,9 @@ adp_thr_mgr_new(char *tname,
     tname_len = i + 1;
     
     this->max_sockets = max_sockets;
-    this->max_pipes = max_pipes*2 + 4; /* 2fds per pipe; 4fds additional for internal use */
+
+    /* 2fds per pipe; 4fds additional for internal use */    
+    this->max_pipes = max_pipes*2 + 4;
     this->num_pipes = 0;
     this->num_sockets = 0;
 
@@ -92,7 +97,7 @@ adp_thr_mgr_new(char *tname,
     g_mutex_init(this->adp_thr_init_cv_mutex);
     g_cond_init(this->adp_thr_init_cv_cond);
 
-    /* create pipe - read is in location 0 and write in 1 */
+    /* create PRIMARY pipe - read is in location 0 and write in 1 */
     if (pipe(this->pipes_arr) == -1) {
         CC_LOG_FATAL("%s(%d): pipe creation failed",__FUNCTION__,
                      __LINE__);
@@ -103,6 +108,10 @@ adp_thr_mgr_new(char *tname,
                  __FUNCTION__, __LINE__, tname,
                  this->pipes_arr[PRI_PIPE_RD_FD],
                  this->pipes_arr[PRI_PIPE_WR_FD]);
+
+    /* Setup information to be sent to the thread during creation */
+    thread_user_data = (adpoll_pollthr_data_t *)
+        malloc(sizeof(adpoll_pollthr_data_t));
 
     strncpy(thread_user_data->tname, this->tname, tname_len);
     thread_user_data->max_pollfds = max_sockets + this->max_pipes;
@@ -115,14 +124,16 @@ adp_thr_mgr_new(char *tname,
                             (GThreadFunc) adp_thr_mgr_poll_thread_func,
                             thread_user_data);
 
-    /* synchronize with thr_mgr_poll_thread_func */
+    /* synchronize with thr_mgr_poll_thread_func
+       Wait till thread is created*/
     g_mutex_lock(this->adp_thr_init_cv_mutex);
     
     g_cond_wait(this->adp_thr_init_cv_cond,
                 this->adp_thr_init_cv_mutex);
     g_mutex_unlock(this->adp_thr_init_cv_mutex);
 
-    
+
+    /* Add a DATA PIPE via the manager's own API */
     add_datapipe_msg.fd_type = PIPE;
     add_datapipe_msg.fd_action = ADD_FD;
     add_datapipe_msg.poll_events = POLLIN;
@@ -140,7 +151,7 @@ adp_thr_mgr_new(char *tname,
     return this;
 }
 
-/* NOTE: application needs to clear the this pointer */
+/* NOTE: application needs to clear the 'this' pointer */
 void adp_thr_mgr_free(adpoll_thread_mgr_t *this)
 {
     int i;

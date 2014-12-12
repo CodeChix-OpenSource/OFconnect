@@ -75,7 +75,9 @@
 #define UNUSED __attribute__ ((__unused__))
 #endif
 
-/* Thread-private data for Polling Thread */
+/* Holds thread-private data for Polling Thread
+   The data itself is defined by struct pollthr_private_t
+ */
 GPrivate tname_key;
 
 typedef enum adpoll_fd_type_ {
@@ -209,7 +211,7 @@ uint32_t adp_thr_mgr_get_num_avail_sockfd(adpoll_thread_mgr_t *this);
 void adp_thr_mgr_free(adpoll_thread_mgr_t *this);
 
 /********************************************************************/
-/* ADPOLL-THREAD PRIVATE */
+/* ADPOLL-THREAD INTERNAL DECLARATIONS */
 /********************************************************************/
 /* parameter for starting new thread manager */
 typedef struct adpoll_pollthr_data_ {

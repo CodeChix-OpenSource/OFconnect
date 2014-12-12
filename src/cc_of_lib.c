@@ -122,7 +122,7 @@ cc_of_lib_init(of_dev_type_e dev_type)
     cc_of_global.ofrw_pollthr_list = NULL;
     g_mutex_init(&cc_of_global.ofrw_pollthr_list_lock);
     adpoll_thread_mgr_t *tmgr = NULL;
-    if ((status = cc_create_rw_pollthr(&tmgr)) < 0) {
+    if ((status = cc_create_rw_pollthr_safe(&tmgr)) < 0) {
 	    cc_of_lib_free();
 	    CC_LOG_FATAL("%s(%d): %s", __FUNCTION__, __LINE__, 
                      cc_of_strerror(status));
@@ -837,7 +837,7 @@ cc_of_send_pkt(uint64_t dp_id, uint8_t aux_id, void *of_msg,
     chann_info = (cc_ofchannel_info_t *)chht_info;
     send_rwsock = chann_info->rw_sockfd;
 
-    find_thrmgr_rwsocket(send_rwsock, &tmgr);
+    find_thrmgr_rwsocket_safe(send_rwsock, &tmgr);
 
     if (tmgr == NULL) {
         CC_LOG_ERROR("%s(%d): socket %d is invalid",
@@ -900,7 +900,7 @@ cc_of_set_real_dpid_auxid(uint64_t dummy_dpid, uint8_t dummy_auxid,
 
 
     memcpy(&ofchann_info_new, ofchann_info_old, sizeof(cc_ofchannel_info_t));
-    status = del_ofchann_rwsocket((int)dummy_dpid);
+    status = del_ofchann_rwsocket_lockfree((int)dummy_dpid);
 	print_ofchann_htbl();
     update_global_htbl_lockfree(OFCHANN, ADD, (gpointer)&ofchann_key_new, 
                        &ofchann_info_new, &new_entry); 

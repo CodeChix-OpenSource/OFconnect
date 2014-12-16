@@ -369,6 +369,19 @@ fd_entry_free(adpoll_fd_info_t *data)
     free(data);
 }
 
+/* Function: poll_fd_process
+
+   This function is called by the polling loop in
+   adp_thr_mgr_poll_thread_func when poll() returns
+   a valid event.
+   
+   poll_fd_process iterates through the entire fd_list
+   and processes the specific event on the correct fd.
+
+   POLLIN: call the registered callback for processing
+   POLLOUT: retrieve the relevant data from hash table
+   and send out on fd
+*/
 static void
 poll_fd_process(adpoll_fd_info_t *data_p,
                 char *tname)

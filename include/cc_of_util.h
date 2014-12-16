@@ -48,6 +48,9 @@ typedef enum htbl_type_ {
     OFCHANN
 } htbl_type_e;
 
+/********************************************************************/
+/* Hash Table Manipulation Functions */
+/********************************************************************/
 guint cc_ofdev_hash_func(gconstpointer key);
 
 guint cc_ofchann_hash_func(gconstpointer key);
@@ -67,20 +70,9 @@ gboolean cc_ofchannel_htbl_equal_func(gconstpointer a,
 gboolean cc_ofrw_htbl_equal_func(gconstpointer a, 
                                  gconstpointer b);
 
-cc_of_ret
-update_global_htbl(htbl_type_e htbl_type,
-                   htbl_update_ops_e htbl_op,
-                   gpointer htbl_key,
-                   gpointer htbl_data,
-                   gboolean *new_entry);
-
-cc_of_ret
-update_global_htbl_lockfree(htbl_type_e htbl_type,
-                            htbl_update_ops_e htbl_op,
-                            gpointer htbl_key,
-                            gpointer htbl_data,
-                            gboolean *new_entry);
-
+/********************************************************************/
+/* Global Hash Table Print Functions */
+/********************************************************************/
 void
 print_ofdev_htbl(void);
 void
@@ -89,52 +81,54 @@ void
 print_ofchann_htbl(void);
 
 
+/********************************************************************/
+/* Global Hash Table Access Functions */
+/********************************************************************/
+cc_of_ret
+update_global_htbl_lockfree(htbl_type_e htbl_type,
+                            htbl_update_ops_e htbl_op,
+                            gpointer htbl_key,
+                            gpointer htbl_data,
+                            gboolean *new_entry);
 
-void
-print_ofrw_htbl(void);
-
-void
-print_ofchann_htbl(void);
-
-
-
+/* static functions
 cc_of_ret
 del_ofrw_rwsocket(int del_fd);
 
 cc_of_ret
 add_upd_ofrw_ofdev_rwsocket(int add_fd);
 
+static cc_of_ret
+add_ofdev_rwsocket_lockfree(cc_ofdev_key_t key, int rwsock);
+
 cc_of_ret
-find_thrmgr_rwsocket(int sockfd,  
-                     adpoll_thread_mgr_t **tmgr);
+del_ofdev_rwsocket_lockfree(cc_ofdev_key_t key, int rwsock);
+
+cc_of_ret
+add_upd_ofchann_rwsocket_lockfree(cc_ofchannel_key_t key, int rwsock);
+*/
+cc_of_ret
+del_ofchann_rwsocket_lockfree(int rwsock);
+
+cc_of_ret
+find_ofchann_key_rwsocket_lockfree(int sockfd, 
+                                   cc_ofchannel_key_t **fd_chann_key);
+
+cc_of_ret
+find_thrmgr_rwsocket_safe(int sockfd,  
+                          adpoll_thread_mgr_t **tmgr);
 
 cc_of_ret
 find_thrmgr_rwsocket_lockfree(int sockfd,  
                      adpoll_thread_mgr_t **tmgr);
 
 cc_of_ret
-add_upd_ofchann_rwsocket(cc_ofchannel_key_t key,
-                         int rwsock);
-
-cc_of_ret
-del_ofchann_rwsocket(int rwsock);
-
-cc_of_ret
-find_ofchann_key_rwsocket(int sockfd, 
-                          cc_ofchannel_key_t **fd_chann_key);
-
-cc_of_ret
-add_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock);
-
-cc_of_ret
-del_ofdev_rwsocket(cc_ofdev_key_t key, int rwsock);
-
-cc_of_ret
-atomic_add_upd_htbls_with_rwsocket(int sockfd, struct sockaddr_in *client_addr, 
-                                   adpoll_thread_mgr_t  *thr_mgr,
-                                   cc_ofdev_key_t key,
-                                   L4_type_e layer4_proto, 
-                                   cc_ofchannel_key_t ofchann_key);
+atomic_add_upd_htbls_with_rwsocket_lockfree(
+    int sockfd, struct sockaddr_in *client_addr, 
+    adpoll_thread_mgr_t  *thr_mgr,
+    cc_ofdev_key_t key,
+    L4_type_e layer4_proto, 
+    cc_ofchannel_key_t ofchann_key);
 
 /*-----------------------------------------------------------------------*/
 /* POLLTHR utilities                                                     */
@@ -144,25 +138,26 @@ atomic_add_upd_htbls_with_rwsocket(int sockfd, struct sockaddr_in *client_addr,
 /*-----------------------------------------------------------------------*/
 
 cc_of_ret
-cc_create_rw_pollthr(adpoll_thread_mgr_t **tmgr);
+cc_create_rw_pollthr_safe(adpoll_thread_mgr_t **tmgr);
 
 guint
-cc_get_count_rw_pollthr(void);
+cc_get_count_rw_pollthr_safe(void);
 
 
 cc_of_ret
-cc_find_or_create_rw_pollthr(adpoll_thread_mgr_t **tmgr);
+cc_find_or_create_rw_pollthr_safe(adpoll_thread_mgr_t **tmgr);
 
 
 cc_of_ret
-cc_del_sockfd_rw_pollthr(adpoll_thread_mgr_t *tmgr, 
-                         adpoll_thr_msg_t *msg);
+cc_del_sockfd_rw_pollthr_lockfree(adpoll_thread_mgr_t *tmgr, 
+                                  adpoll_thr_msg_t *msg);
 
 
+/* This function ACQUIRES LOCKS */
 cc_of_ret
-cc_add_sockfd_rw_pollthr(adpoll_thr_msg_t *msg, 
-                         cc_ofdev_key_t key, 
-                         L4_type_e layer4_proto,
-                         cc_ofchannel_key_t ofchann_key);
+cc_add_sockfd_rw_pollthr_safe(adpoll_thr_msg_t *msg, 
+                              cc_ofdev_key_t key, 
+                              L4_type_e layer4_proto,
+                              cc_ofchannel_key_t ofchann_key);
 
 #endif //CC_OF_UTIL_H

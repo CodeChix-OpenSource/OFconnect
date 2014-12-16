@@ -160,7 +160,7 @@ void process_tcpfd_pollin_func(char *tname,
     g_mutex_lock(&cc_of_global.ofrw_htbl_lock);
 
     print_ofchann_htbl();
-    status = find_ofchann_key_rwsocket(tcp_sockfd, &fd_chann_key);
+    status = find_ofchann_key_rwsocket_lockfree(tcp_sockfd, &fd_chann_key);
     if (status < 0) {
         CC_LOG_ERROR("%s(%d)[%s]: could not find ofchann key for sockfd %d",
 
@@ -325,7 +325,7 @@ cc_of_ret tcp_open_clientfd(cc_ofdev_key_t key, cc_ofchannel_key_t ofchann_key)
     thr_msg.pollin_func = &process_tcpfd_pollin_func;
     thr_msg.pollout_func = &process_tcpfd_pollout_func;
         
-    status = cc_add_sockfd_rw_pollthr(&thr_msg, key, TCP, ofchann_key);
+    status = cc_add_sockfd_rw_pollthr_safe(&thr_msg, key, TCP, ofchann_key);
     if (status < 0) {
 	    CC_LOG_ERROR("%s(%d):Error updating tcp sockfd in global structures: %s",
                      __FUNCTION__, __LINE__, cc_of_strerror(errno));
@@ -449,7 +449,7 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
     thr_msg.pollin_func = &process_tcpfd_pollin_func;
     thr_msg.pollout_func = &process_tcpfd_pollout_func;
     
-    status = cc_add_sockfd_rw_pollthr(&thr_msg, key, TCP, chann_key);
+    status = cc_add_sockfd_rw_pollthr_safe(&thr_msg, key, TCP, chann_key);
     if (status < 0) {
 	    CC_LOG_ERROR("%s(%d):Error updating sockfd in global structures: %s",
                      __FUNCTION__, __LINE__, cc_of_strerror(errno));
@@ -491,6 +491,7 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
         CC_LOG_ERROR("%s(%d): could not find rwinfo in ofrw_htbl"
                      "for the newly connected socket %d", 
                      __FUNCTION__, __LINE__, connfd);
+        g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);        
         return CC_OF_EHTBL;
     }
     memcpy(&rw_info_new, rw_info, sizeof(cc_ofrw_info_t));
@@ -501,7 +502,7 @@ cc_of_ret tcp_accept(int listenfd, cc_ofdev_key_t key)
                 __FUNCTION__, __LINE__);
     print_ofrw_htbl();
     
-    g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);        
+    g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
 
     return connfd;
 }
@@ -542,7 +543,7 @@ cc_of_ret tcp_close(int sockfd)
     CC_LOG_DEBUG("%s(%d): Starting", __FUNCTION__, __LINE__);
 
 #if 0
-    status = find_ofchann_key_rwsocket(tcp_sockfd, &fd_chann_key);
+    status = find_ofchann_key_rwsocket_lockfree(tcp_sockfd, &fd_chann_key);
     if (status < 0) {
         CC_LOG_ERROR("%s(%d): could not find ofchann key for sockfd %d",
                      __FUNCTION__, __LINE__, tcp_sockfd);
@@ -564,7 +565,7 @@ cc_of_ret tcp_close(int sockfd)
     }
 
     // Update global htbls
-    status = cc_del_sockfd_rw_pollthr(tmgr, &thr_msg);
+    status = cc_del_sockfd_rw_pollthr_lockfree(tmgr, &thr_msg);
     if (status < 0) {
         CC_LOG_ERROR("%s(%d): %s, error while deleting tcp sockfd %d "
                      "from global structures", __FUNCTION__, __LINE__, 

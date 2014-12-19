@@ -33,15 +33,18 @@ Summary of global data:
        (controller-ip, switch-ip, L4 port 3-tuple): 
        listen socket, rw sockets.
 
-NOTE: an INSTANCE of a controller: IP address + L4 port number
-NOTE: Both UDP and TCP could use this port number and they will be 2 independent channels.
+NOTE: an INSTANCE of a controller: 
+      IP address + L4 port number
+NOTE: Both UDP and TCP could use this port number 
+      and they will be 2 independent channels.
 
 
 2. OFchannel:
     Maps DP-ID/AUX-ID to rw-socket fd
 
 3. OFRW:
-    Maintains all RW-socket specific data: state, l4 protocol type, thread_mgr_p and other details
+    Maintains all RW-socket specific data: state, 
+    l4 protocol type, thread_mgr_p and other details
 
 Other global information maintained:
 1. thread_mgr_p for listen socket
@@ -49,21 +52,29 @@ Other global information maintained:
 3. transport protocol action callbacks (net services)
 
 Listen Poll Thread - SERVER ONLY (controller):
-1. Single thread that processes datagrams on the main socket of the protocol.
+1. Single thread that processes datagrams on the 
+   main socket of the protocol.
 2. A single sockfd per port, per protocol 
-3. A poll-in function per socket - this uniquely processes the socket PACKET-IN for that specific transport protocol.
+3. A poll-in function per socket - this uniquely 
+   processes the socket PACKET-IN for that specific 
+   transport protocol.
 
 Checklist for adding a new L4 protocol:
 ======================================
 1. Update L4_type_e (cc_of_lib.h)
 
-2. Create a new file and define the callbacks for NET_SVCS, and POLL-IN/POLL-OUT functions for various sockets (main socket and read/write sockets) that can be opened with this protocol. 
+2. Create a new file and define the callbacks for NET_SVCS, 
+   and POLL-IN/POLL-OUT functions for various sockets 
+   (main socket and read/write sockets) that can be opened 
+   with this protocol. 
 
 Other things to consider:
 =========================
 1. 
-a. Static information required from Controller at the time of registration?
-b. New dynamic per-device data to be maintained? (Eg: Listen socket for the new protocol)
+    a. Static information required from Controller at the 
+       time of registration?
+    b. New dynamic per-device data to be maintained? 
+       (Eg: Listen socket for the new protocol)
 If yes for either:
     a. update the cc_of_dev_register API
     b. new field in OFdev
@@ -72,6 +83,8 @@ If yes for either:
 If yes,
     a. New field in OFrw table
 
-3. May require a new library API callback if some of the processing needs to be performed by the Controller/Switch.
+3. May require a new library API callback if some of the 
+   processing needs to be performed by the Controller/Switch.
 
-4. NOTE: set state of socket to UP only once fully initialized by the listen POLLIN function
+4. NOTE: set state of socket to UP only once fully initialized 
+   by the listen POLLIN function

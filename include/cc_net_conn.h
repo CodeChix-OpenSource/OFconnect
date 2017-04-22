@@ -40,11 +40,31 @@ typedef enum addr_type_ {
     IPV6
 } addr_type_e;
 
+typedef enum cc_ofrw_state_ {
+    CC_OF_RW_DOWN = 0,
+    CC_OF_RW_UP
+} cc_ofrw_state_e;
+
 typedef struct cc_ofdev_key_ {
     ipaddr_v4v6_t  controller_ip_addr;
     ipaddr_v4v6_t  switch_ip_addr; 
     uint16_t       controller_L4_port;
 } cc_ofdev_key_t;
+
+/* node in ofdev_htbl */
+typedef struct cc_ofdev_info_ {
+    cc_ofver_e     of_max_ver;  /* cc_ofver_e */
+    
+    GList          *ofrw_socket_list; //list of rw sockets
+
+    cc_of_recv_pkt recv_func; /* cc_of_recv_pkt function ptr */
+    cc_of_accept_channel accept_chann_func; /* cc_of_accept_channel func ptr */
+    cc_of_delete_channel del_chann_func;/* cc_of_delete_channel function ptr */
+
+    int            main_sockfd_tcp;
+    int            main_sockfd_udp;
+} cc_ofdev_info_t;
+
 
 /* mapping of channel key (dp-id/aux-id) to rw_sockfd) */
 typedef struct cc_ofchannel_key_ {
@@ -63,25 +83,6 @@ typedef struct cc_ofchannel_info_ {
     int                   count_retries; /* CLIENT: reconnection attempts */
     cc_ofstats_t          stats;    
 } cc_ofchannel_info_t;
-
-/* node in ofdev_htbl */
-typedef struct cc_ofdev_info_ {
-    cc_ofver_e     of_max_ver;  /* cc_ofver_e */
-    
-    GList          *ofrw_socket_list; //list of rw sockets
-
-    cc_of_recv_pkt recv_func; /* cc_of_recv_pkt function ptr */
-    cc_of_accept_channel accept_chann_func; /* cc_of_accept_channel func ptr */
-    cc_of_delete_channel del_chann_func;/* cc_of_delete_channel function ptr */
-
-    int            main_sockfd_tcp;
-    int            main_sockfd_udp;
-} cc_ofdev_info_t;
-
-typedef enum cc_ofrw_state_ {
-    CC_OF_RW_DOWN = 0,
-    CC_OF_RW_UP
-} cc_ofrw_state_e;
 
 typedef struct cc_ofrw_key_ {
     int       rw_sockfd;    

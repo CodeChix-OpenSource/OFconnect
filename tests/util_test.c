@@ -136,7 +136,7 @@ util_start(test_data_t *tdata,
 
    
     cc_of_log_clear();
-    cc_create_rw_pollthr(&temp_mgr_p);
+    cc_create_rw_pollthr_safe(&temp_mgr_p);
     g_assert(temp_mgr_p != NULL);
     
     g_memmove(&tdata->tp_data[0], temp_mgr_p, sizeof(adpoll_thread_mgr_t));
@@ -487,7 +487,7 @@ util_tc_2(test_data_t *tdata UNUSED, gconstpointer tudata)
     thr_msg.pollin_func = &process_tcpfd_pollin_func;
     thr_msg.pollout_func = &process_tcpfd_pollout_func;
     
-    client_status = cc_add_sockfd_rw_pollthr(&thr_msg, devkey, TCP, ofchann_key);
+    client_status = cc_add_sockfd_rw_pollthr_safe(&thr_msg, devkey, TCP, ofchann_key);
     if (client_status < 0) {
         CC_LOG_ERROR("%s(%d):Error updating tcp sockfd in global structures: %s",
                      __FUNCTION__, __LINE__, cc_of_strerror(errno));

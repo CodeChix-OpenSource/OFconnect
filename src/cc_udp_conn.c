@@ -142,10 +142,10 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
             }
             ofchann_key.dp_id = dummy_udp_sockfd;
             ofchann_key.aux_id = dummy_udp_sockfd;
-            atomic_add_upd_htbls_with_rwsocket(dummy_udp_sockfd, &src_addr, 
-                                               NULL, tmp_rwinfo->dev_key, 
-                                               UDP, ofchann_key);
-
+            atomic_add_upd_htbls_with_rwsocket_lockfree(
+                dummy_udp_sockfd, &src_addr, 
+                NULL, tmp_rwinfo->dev_key, 
+                UDP, ofchann_key);
         }
         /* If CONTROLLER, use dummysockfd for htbl lookups instead of the
          * main_sockfd_udp of the device. If SWITCH, each connection will
@@ -154,7 +154,7 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
         udp_sockfd = dummy_udp_sockfd;
     }
 
-    status = find_ofchann_key_rwsocket(udp_sockfd, &fd_chann_key);
+    status = find_ofchann_key_rwsocket_lockfree(udp_sockfd, &fd_chann_key);
     if (status < 0) {
         CC_LOG_ERROR("%s(%d): could not find ofchann key for sockfd %d",
                      __FUNCTION__, __LINE__, udp_sockfd);
@@ -216,12 +216,18 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
                 CC_LOG_ERROR("%s(%d): could not find rwinfo in ofrw_htbl"
                              "for the newly connected socket %d", 
                             __FUNCTION__, __LINE__, udp_sockfd);
+                g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+                g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+                g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);                
                 return;
             }
             memcpy(&rinfo_new, rinfo, sizeof(cc_ofrw_info_t));
             rinfo_new.state = CC_OF_RW_UP;
-            update_global_htbl(OFRW, ADD, (gpointer)&rkey, (gpointer)&rinfo_new, 
-                               &new_entry);
+            
+            update_global_htbl_lockfree(OFRW, ADD, (gpointer)&rkey,
+                                        (gpointer)&rinfo_new, 
+                                        &new_entry);
+            
             CC_LOG_DEBUG("%s(%d): Updated UDP channel State to CC_OF_RW_UP",
                         __FUNCTION__, __LINE__);
         }
@@ -246,6 +252,10 @@ static void process_udpfd_pollin_func(char *tname UNUSED,
                          "ready to rev mesgs on UDP channel dp_id-%lu aux_id-%u",
                          __FUNCTION__, __LINE__, fd_chann_key->dp_id, 
                          fd_chann_key->aux_id);
+            
+            g_mutex_unlock(&cc_of_global.ofrw_htbl_lock);
+            g_mutex_unlock(&cc_of_global.ofchannel_htbl_lock);
+            g_mutex_unlock(&cc_of_global.ofdev_htbl_lock);
             return;
         }
     }
@@ -410,7 +420,7 @@ int udp_open_clientfd(cc_ofdev_key_t key, cc_ofchannel_key_t ofchann_key)
     thr_msg.pollin_func = &process_udpfd_pollin_func;
     thr_msg.pollout_func = &process_udpfd_pollout_func;
         
-    status = cc_add_sockfd_rw_pollthr(&thr_msg, key, UDP, ofchann_key);
+    status = cc_add_sockfd_rw_pollthr_safe(&thr_msg, key, UDP, ofchann_key);
     if (status < 0) {
 	    CC_LOG_ERROR("%s(%d):Error updating udp sockfd in global structures: %s",
                      __FUNCTION__, __LINE__, cc_of_strerror(errno));
@@ -472,7 +482,7 @@ int udp_open_serverfd(cc_ofdev_key_t key)
     /* A single udp serverfd will serve multiple channnels/clients from
      * switches. This will be stored as dev_info->main_sockfd_udp. 
      */
-    status = cc_add_sockfd_rw_pollthr(&thr_msg, key, UDP, ckey);
+    status = cc_add_sockfd_rw_pollthr_safe(&thr_msg, key, UDP, ckey);
     if (status < 0) {
 	    CC_LOG_ERROR("%s(%d):Error updating udp sockfd in global structures: %s",
                      __FUNCTION__, __LINE__, cc_of_strerror(errno));
@@ -516,7 +526,7 @@ int udp_close(int sockfd)
     }
 
     // Update global htbls
-    status = cc_del_sockfd_rw_pollthr(tmgr, &thr_msg);
+    status = cc_del_sockfd_rw_pollthr_lockfree(tmgr, &thr_msg);
     if (status < 0) {
         CC_LOG_ERROR("%s(%d): %s, error while deleting udp sockfd %d "
                      "from global structures", __FUNCTION__, __LINE__, 
